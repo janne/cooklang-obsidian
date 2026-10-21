@@ -18,11 +18,9 @@
     function scrollTo(event: MouseEvent, selector: string): void {
         event.preventDefault();
         const current = event.currentTarget as HTMLElement;
-        const target = current.closest('.cook-rich')?.querySelector(selector);
-        // A collapsed section (e.g. a menu's combined ingredients) opens when jumped to.
-        // Compare tag names: `instanceof` fails for elements in Obsidian pop-out windows.
-        if (target?.tagName === 'DETAILS') (target as HTMLDetailsElement).open = true;
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        current.closest('.cook-rich')
+            ?.querySelector(selector)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 </script>
 

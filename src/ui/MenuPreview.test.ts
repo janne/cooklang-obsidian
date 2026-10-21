@@ -113,9 +113,7 @@ describe('MenuPreview', () => {
             dependencies: [],
         } });
 
-        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('details')!;
-        expect(combined.open).toBe(true);
-        expect(within(combined).getByText('2')).toBeTruthy();
+        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('section')!;
         expect(within(combined).getByText('600 g')).toBeTruthy();
         expect(within(combined).getByRole('heading', { name: 'Optional' })).toBeTruthy();
         expect(screen.getByText('Salads/Boring')).toBeTruthy();
@@ -125,15 +123,10 @@ describe('MenuPreview', () => {
         expect(onIngredientToggle).toHaveBeenCalledWith('rice');
     });
 
-    it('puts the plan before the ingredients and reopens a collapsed list from the bar', async () => {
+    it('puts the plan before the ingredients', () => {
         setup({ status: 'loading' });
         const plan = screen.getByRole('heading', { name: 'Plan' });
-        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('details')!;
+        const combined = screen.getByRole('heading', { name: 'Combined ingredients' });
         expect(plan.compareDocumentPosition(combined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-        combined.open = false;
-        Element.prototype.scrollIntoView = vi.fn();
-        await fireEvent.click(screen.getByRole('link', { name: 'Ingredients' }));
-        expect(combined.open).toBe(true);
     });
 });

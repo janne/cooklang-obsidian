@@ -588,22 +588,6 @@
   .cook-menu-cols:not(.cook-cols-stacked) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cook-menu-cols:not(.cook-cols-stacked) > .cook-aside { margin-top: 0; }
 }
-.cook-menu-combined > summary {
-  display: flex; align-items: center; gap: var(--size-4-2, 8px);
-  list-style: none; cursor: pointer; margin-bottom: var(--size-4-3, 12px);
-}
-.cook-menu-combined > summary::-webkit-details-marker { display: none; }
-.cook-menu-combined > summary .cook-section-title { margin: 0; }
-.cook-menu-combined-count {
-  padding: 0 7px; border-radius: 999px; font-size: 0.75em; font-variant-numeric: tabular-nums;
-  background: var(--background-secondary); color: var(--text-muted);
-}
-.cook-menu-combined > summary .cook-ing-disclosure-icon { margin-left: auto; }
-.cook-menu-combined[open] > summary .cook-ing-disclosure-icon { transform: rotate(225deg) translate(-1px, -1px); }
-.cook-menu-combined:not([open]) > summary { margin-bottom: 0; }
-@media (pointer: coarse) {
-  .cook-menu-combined > summary { min-height: 48px; }
-}
 .cook-menu-problems { margin-top: var(--size-4-3, 12px); }
 .cook-menu-problem-list { margin: 0; padding-left: 1.2em; color: var(--text-muted); font-size: 0.85em; }
 .cook-menu-problem-name { color: var(--text-error); font-weight: 600; }
@@ -679,7 +663,6 @@
 .cook-stepper-btn:focus-visible,
 .cook-ing-checkbox:focus-visible,
 .cook-ing-details > summary:focus-visible,
-.cook-menu-combined > summary:focus-visible,
 .cook-step-toggle:focus-visible,
 .cook-timer-btn:focus-visible,
 .cook-timer-reset-btn:focus-visible,
