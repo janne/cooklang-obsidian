@@ -225,6 +225,7 @@ export default class CookPlugin extends Plugin {
       });
       this.routingReady = true;
       routeLeaves();
+      this.extendFollowLinkCommand();
       this.registerVimFollow();
     });
 
@@ -468,25 +469,46 @@ export default class CookPlugin extends Plugin {
   }
 
   /**
-   * In Vim mode, `gf` opens the recipe reference under the cursor and otherwise
-   * follows the link under the cursor as Obsidian would. The Vim API is only
-   * reachable through Obsidian's global CodeMirror adapter.
+   * Obsidian's "Follow link under cursor" also follows a recipe reference. Vim
+   * `gf` mappings (Vimrc Support's, or ours below) and the command's hotkey all
+   * run this command, so wrapping it works whichever mapping wins. The command
+   * registry is not public API; when its shape differs, it is left untouched.
+   */
+  private extendFollowLinkCommand(): void {
+    type CheckCallback = (checking: boolean) => boolean | void;
+    const registry = (this.app as unknown as { commands?: { commands?: Record<string, { checkCallback?: CheckCallback }> } })
+      .commands?.commands;
+    const command = registry?.['editor:follow-link'];
+    const original = command?.checkCallback;
+    if (this.disposed || !command || typeof original !== 'function') return;
+    const extended: CheckCallback = checking => {
+      const active = this.app.workspace.activeEditor;
+      const file = active?.file ?? null;
+      const reference = active?.editor ? this.referenceUnderCursor(active.editor, file) : null;
+      if (!file || !reference) return original.call(command, checking);
+      if (!checking) this.openSourceReference(file.path, reference.target);
+      return true;
+    };
+    command.checkCallback = extended;
+    this.register(() => {
+      if (command.checkCallback === extended) command.checkCallback = original;
+    });
+  }
+
+  /**
+   * Obsidian's Vim mode has no `gf`; map it to "Follow link under cursor". A
+   * vimrc plugin that maps `gf` later takes precedence, which is fine when it
+   * runs the same command. The Vim API is only reachable through Obsidian's
+   * global CodeMirror adapter.
    */
   private registerVimFollow(): void {
     const vim = (window as unknown as { CodeMirrorAdapter?: { Vim?: VimApi } }).CodeMirrorAdapter?.Vim;
     if (this.disposed || !vim) return;
-    vim.defineAction('cooklangFollowReference', () => {
-      const active = this.app.workspace.activeEditor;
-      const file = active?.file ?? null;
-      const reference = active?.editor ? this.referenceUnderCursor(active.editor, file) : null;
-      if (file && reference) {
-        this.openSourceReference(file.path, reference.target);
-        return;
-      }
+    vim.defineAction('cooklangFollowLink', () => {
       const commands = (this.app as unknown as { commands?: { executeCommandById(id: string): boolean } }).commands;
       commands?.executeCommandById('editor:follow-link');
     });
-    vim.mapCommand('gf', 'action', 'cooklangFollowReference', {}, { context: 'normal' });
+    vim.mapCommand('gf', 'action', 'cooklangFollowLink', {}, { context: 'normal' });
     this.register(() => {
       try {
         vim.unmap('gf', 'normal');

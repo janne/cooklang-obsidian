@@ -181,9 +181,9 @@ desktop you can also drag recipes from the file explorer into a menu to insert
 references where they land.
 In the editor, references look like `[[links]]`: hover with Cmd/Ctrl for a page
 preview, Cmd/Ctrl+click one, use **Open recipe
-reference under cursor** (or the editor's context menu), or press `gf` in Vim
-mode to open the recipe at the reference's scale. Elsewhere `gf` follows the link
-under the cursor. The
+reference under cursor** (or the editor's context menu), use Obsidian's **Follow
+link under cursor**, or press `gf` in Vim mode (including a `gf` mapped by Vimrc
+Support) to open the recipe at the reference's scale. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
 step as a meal, with links that open the referenced recipe already scaled. A
 meal written as a `- ` list shows one item per line, even without the trailing
