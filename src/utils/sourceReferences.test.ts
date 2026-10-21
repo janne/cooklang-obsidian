@@ -5,8 +5,10 @@ describe('source references', () => {
     it('finds complete references with their amounts', () => {
         const line = '- @./Recept/Litauiska pannkakor{} med @lingonsylt{1%dl} och @?./Recept/Pizzasallad{1/2}';
         expect(findSourceReferences(line)).toEqual([
-            { from: 2, to: 33, target: { name: 'Litauiska pannkakor', components: ['.', 'Recept'], quantity: null, unit: null } },
-            { from: 60, to: 87, target: { name: 'Pizzasallad', components: ['.', 'Recept'], quantity: 0.5, unit: null } },
+            { from: 2, to: 33, pathFrom: 3, pathTo: 31,
+                target: { name: 'Litauiska pannkakor', components: ['.', 'Recept'], quantity: null, unit: null } },
+            { from: 60, to: 87, pathFrom: 62, pathTo: 82,
+                target: { name: 'Pizzasallad', components: ['.', 'Recept'], quantity: 0.5, unit: null } },
         ]);
     });
 

@@ -146,6 +146,21 @@
 
 // Only token colors are ours; layout and editor behavior belong to Obsidian.
 .markdown-source-view {
+  // Recipe references read like `[[links]]` in Source mode: the path as link
+  // text over any token color, `@` and `{…}` dimmed like the brackets.
+  .cook-source-reference,
+  .cook-source-reference [class*='cook-token'] {
+    color: var(--link-color);
+    text-decoration-line: var(--link-decoration, none);
+    cursor: var(--cursor-link, pointer);
+  }
+  .cook-source-reference:hover,
+  .cook-source-reference:hover [class*='cook-token'] {
+    color: var(--link-color-hover);
+    text-decoration-line: var(--link-decoration-hover, underline);
+  }
+  .cook-source-reference-syntax,
+  .cook-source-reference-syntax [class*='cook-token'] { color: var(--text-faint); }
   .cook-token-ingredient { color: var(--text-accent); }
   .cook-token-cookware { color: var(--color-green); }
   .cook-token-timer { color: var(--color-pink); }
@@ -592,9 +607,6 @@
 .cook-menu-problems { margin-top: var(--size-4-3, 12px); }
 .cook-menu-problem-list { margin: 0; padding-left: 1.2em; color: var(--text-muted); font-size: 0.85em; }
 .cook-menu-problem-name { color: var(--text-error); font-weight: 600; }
-
-/* Recipe references in the source editor: Mod+click or `gf` opens them. */
-.cook-source-reference { text-decoration: underline dotted; text-underline-offset: 3px; }
 
 /* `@./` recipe reference autocomplete */
 .cook-reference-suggestion-path { color: var(--text-muted); font-size: var(--font-ui-smaller); }

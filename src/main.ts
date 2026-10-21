@@ -11,6 +11,8 @@ import {
   Notice,
   TextFileView,
   type Editor,
+  type HoverParent,
+  type MarkdownFileInfo,
   parseYaml,
   stringifyYaml,
 } from 'obsidian';
@@ -30,7 +32,7 @@ import { RecipeFormatModal } from './ui/RecipeFormatModal';
 import { RecipeEmbedChild } from './ui/RecipeEmbedChild';
 import { RecipeReferenceSuggest } from './ui/RecipeReferenceSuggest';
 import { wholeRecipeEmbedRoot, WholeRecipeEmbedRegistry } from './utils/wholeRecipeEmbeds';
-import { nativeCookEditor } from './mode/cook/nativeEditor';
+import { nativeCookEditor, sourceReferenceEvents } from './mode/cook/nativeEditor';
 import { isRecipeSource } from './utils/recipeSource';
 import { RecipeSessions, type RecipeSession } from './services/RecipeSessions';
 import { TimerService } from './services/TimerService';
@@ -110,7 +112,8 @@ export default class CookPlugin extends Plugin {
     // register the view and extensions
     this.registerView("cook", this.cookViewCreator);
     this.registerExtensions(["cook", "menu"], "markdown");
-    this.registerEditorExtension(nativeCookEditor(this.routeLeaves, this.openSourceReference));
+    this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
+    this.registerEditorExtension(sourceReferenceEvents({ open: this.openSourceReference, hover: this.hoverSourceReference }));
     this.registerEditorSuggest(new RecipeReferenceSuggest(this.app));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
@@ -392,6 +395,18 @@ export default class CookPlugin extends Plugin {
       return;
     }
     this.recipeHost.openReference(resolved);
+  };
+
+  /** Page preview on hover, with the same modifier rules as an editor `[[link]]`. */
+  private hoverSourceReference = (sourcePath: string, target: RecipeRefTarget, event: MouseEvent,
+      targetEl: HTMLElement, info: MarkdownFileInfo | null): void => {
+    const source = this.app.vault.getAbstractFileByPath(sourcePath);
+    const resolved = this.recipeHost.resolveReference(source instanceof TFile ? source : null, target);
+    if (!resolved) return;
+    const hoverParent: HoverParent = info && 'hoverPopover' in info ? info as unknown as HoverParent : { hoverPopover: null };
+    this.app.workspace.trigger('hover-link', {
+      event, source: 'editor', hoverParent, targetEl, linktext: resolved.targetPath, sourcePath,
+    });
   };
 
   private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {

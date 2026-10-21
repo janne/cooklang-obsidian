@@ -4,7 +4,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { StreamLanguage, language } from '@codemirror/language';
 import { editorInfoField, type MarkdownFileInfo } from 'obsidian';
-import { nativeCookEditor } from './nativeEditor';
+import { nativeCookEditor, sourceReferenceEvents, type SourceReferenceHandlers } from './nativeEditor';
 
 vi.mock('obsidian', async () => {
     const { StateField } = await import('@codemirror/state');
@@ -18,13 +18,14 @@ vi.mock('obsidian', async () => {
 const views: EditorView[] = [];
 afterEach(() => { for (const view of views.splice(0)) view.destroy(); });
 
-function setup(path: string, source: string, openReference?: Parameters<typeof nativeCookEditor>[1]) {
+function setup(path: string, source: string, handlers?: SourceReferenceHandlers) {
     const changed = vi.fn();
-    const extension = nativeCookEditor(changed, openReference);
+    const extension = nativeCookEditor(changed);
     const info = { file: { path } } as MarkdownFileInfo;
     const hostLanguage = StreamLanguage.define({ token: stream => { stream.skipToEnd(); return 'comment'; } });
     const view = new EditorView({ state: EditorState.create({ doc: source,
-        extensions: [hostLanguage, editorInfoField.init(() => info), extension] }) });
+        extensions: [hostLanguage, editorInfoField.init(() => info), extension,
+            handlers ? sourceReferenceEvents(handlers) : []] }) });
     views.push(view);
     return { view, info, changed, hostLanguage, decorations: () => view.plugin(extension)!.decorations };
 }
@@ -61,24 +62,31 @@ describe('native editor decorations', () => {
         expect(changed).toHaveBeenCalledTimes(3);
     });
 
-    it('marks complete references and follows one on Mod+click', () => {
-        const open = vi.fn();
+    it('marks references like links and follows one on Mod+click', () => {
+        const handlers = { open: vi.fn(), hover: vi.fn() };
         const source = 'Dinner: @./Recept/Pizzasallad{2} and @salt';
-        const { view, decorations } = setup('Week.menu', source, open);
-        const classes: string[] = [];
+        const { view, decorations, info } = setup('Week.menu', source, handlers);
+        const marks: string[] = [];
         decorations().between(0, source.length, (from, to, value) => {
-            if (value.spec.class === 'cook-source-reference') classes.push(source.slice(from, to));
+            if (String(value.spec.class).startsWith('cook-source-reference')) marks.push(`${value.spec.class}:${source.slice(from, to)}`);
         });
-        expect(classes).toEqual(['@./Recept/Pizzasallad{2}']);
+        expect(marks.sort()).toEqual([
+            'cook-source-reference-syntax:@',
+            'cook-source-reference-syntax:{2}',
+            'cook-source-reference:./Recept/Pizzasallad',
+        ]);
 
-        const position = source.indexOf('Pizza');
-        view.posAtCoords = () => position;
+        view.posAtCoords = () => source.indexOf('Pizza');
+        const target = { name: 'Pizzasallad', components: ['.', 'Recept'], quantity: 2, unit: null };
         const click = (metaKey: boolean) => view.contentDOM.dispatchEvent(
             new MouseEvent('mousedown', { button: 0, metaKey, bubbles: true, cancelable: true }));
         click(false);
-        expect(open).not.toHaveBeenCalled();
+        expect(handlers.open).not.toHaveBeenCalled();
         click(true);
-        expect(open).toHaveBeenCalledWith('Week.menu',
-            { name: 'Pizzasallad', components: ['.', 'Recept'], quantity: 2, unit: null });
+        expect(handlers.open).toHaveBeenCalledWith('Week.menu', target);
+
+        const link = view.contentDOM.querySelector('.cook-source-reference')!;
+        link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        expect(handlers.hover).toHaveBeenCalledWith('Week.menu', target, expect.any(MouseEvent), link, info);
     });
 });

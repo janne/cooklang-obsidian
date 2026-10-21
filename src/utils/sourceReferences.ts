@@ -9,10 +9,13 @@ export interface SourceReference {
     from: number;
     /** Column after the closing `}`. */
     to: number;
+    /** Columns of the `./Folder/Recipe` path, styled like a link's text. */
+    pathFrom: number;
+    pathTo: number;
     target: RecipeRefTarget;
 }
 
-const REFERENCE = /@\??(\.\/[^{}@\n]*?)\s*\{([^{}\n]*)\}/g;
+const REFERENCE = /(@\??)(\.\/[^{}@\n]*?)\s*\{([^{}\n]*)\}/g;
 
 /** `1/2`, `1.5`, `6%servings`, or `=2`; anything else is the recipe as written. */
 function parseAmount(amount: string): Pick<RecipeRefTarget, 'quantity' | 'unit'> {
@@ -34,11 +37,16 @@ function parsePath(path: string): Pick<RecipeRefTarget, 'name' | 'components'> {
 }
 
 export function findSourceReferences(line: string): SourceReference[] {
-    return [...line.matchAll(REFERENCE)].map(match => ({
-        from: match.index,
-        to: match.index + match[0].length,
-        target: { ...parsePath(match[1]), ...parseAmount(match[2]) },
-    })).filter(reference => reference.target.name);
+    return [...line.matchAll(REFERENCE)].map(match => {
+        const pathFrom = match.index + match[1].length;
+        return {
+            from: match.index,
+            to: match.index + match[0].length,
+            pathFrom,
+            pathTo: pathFrom + match[2].length,
+            target: { ...parsePath(match[2]), ...parseAmount(match[3]) },
+        };
+    }).filter(reference => reference.target.name);
 }
 
 /** The reference containing column `ch`, including its edges. */
