@@ -9,7 +9,7 @@ function setup(defaultView: 'source' | 'preview' = 'preview') {
         if (isCurrent()) target.state = { type, state: { file: path, mode: type === 'cook' ? 'preview' : 'source', source: true, sync: true } };
     });
     const error = vi.fn();
-    const router = new RecipeViewRouter(recognized, switchView, error, () => defaultView);
+    const router = new RecipeViewRouter(recognized, switchView, error, () => defaultView, () => Promise.resolve());
     return { leaf, recognized, switchView, router, error };
 }
 
@@ -157,6 +157,34 @@ describe('Markdown recipe routing', () => {
         switchView.mockRejectedValue(new Error('failed'));
         await router.route(leaf);
         expect(error).toHaveBeenCalledOnce();
+    });
+
+    it('retries a switch that Obsidian ignored while the leaf was still opening the file', async () => {
+        const { leaf, router, switchView } = setup();
+        let busy = 2;
+        const open = switchView.getMockImplementation()!;
+        switchView.mockImplementation(async (...args) => { if (busy-- <= 0) await open(...args); });
+        await router.route(leaf);
+        expect(switchView).toHaveBeenCalledTimes(3);
+        expect(leaf.state.type).toBe('cook');
+    });
+
+    it('stops retrying an ignored switch once the user navigates away', async () => {
+        const { leaf, router, switchView } = setup();
+        switchView.mockImplementation(async target => { target.state = { type: 'image', state: { file: 'Photo.png' } }; });
+        await router.route(leaf);
+        expect(switchView).toHaveBeenCalledOnce();
+    });
+
+    it('routes a fresh recipe again after every switch attempt was ignored', async () => {
+        const { leaf, router, switchView } = setup();
+        const open = switchView.getMockImplementation()!;
+        switchView.mockImplementation(async () => {});
+        await router.route(leaf);
+        expect(switchView).toHaveBeenCalledTimes(20);
+        switchView.mockImplementation(open);
+        await router.route(leaf);
+        expect(leaf.state.type).toBe('cook');
     });
 
     it('cancels pending routing when the plugin unloads', async () => {
