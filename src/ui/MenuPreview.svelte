@@ -23,10 +23,11 @@
         if (combined.list.optional.length) result.push({ name: 'Optional', rows: combined.list.optional });
         return result;
     });
+    // In page order: the plan (and today within it) precedes the ingredients.
     let links = $derived([
-        { selector: '#cook-combined', label: model.settings.ingredientLabel || 'Ingredients' },
         { selector: '#cook-menu-plan', label: 'Plan' },
         ...(days.some(day => day.isToday) ? [{ selector: '#cook-menu-today', label: 'Today' }] : []),
+        { selector: '#cook-combined', label: model.settings.ingredientLabel || 'Ingredients' },
     ]);
 </script>
 

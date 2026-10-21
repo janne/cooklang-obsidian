@@ -94,7 +94,8 @@ describe('MenuPreview', () => {
         expect(within(today).getByRole('heading', { name: 'Breakfast' })).toBeTruthy();
         expect(within(today).getByText('delivery at 4pm')).toBeTruthy();
         expect(screen.getByText('2026-10-22')).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Today' })).toBeTruthy();
+        const bar = screen.getByRole('navigation');
+        expect(within(bar).getAllByRole('link').map(link => link.textContent?.trim())).toEqual(['Plan', 'Today', 'Ingredients']);
         expect(screen.getByText('Combining ingredients…')).toBeTruthy();
 
         await fireEvent.click(screen.getByRole('link', { name: 'Granola' }));
