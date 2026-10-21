@@ -185,7 +185,9 @@ reference under cursor** (or the editor's context menu), or press `gf` in Vim
 mode to open the recipe at the reference's scale. Elsewhere `gf` follows the link
 under the cursor. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
-step as a meal, with links that open the referenced recipe already scaled. The
+step as a meal, with links that open the referenced recipe already scaled. A
+meal written as a `- ` list shows one item per line, even without the trailing
+`\` Cooklang otherwise needs to keep lines apart. The
 plan comes first, beside the ingredients on wide panes and above them on phones.
 The
 **Combined ingredients** list expands every referenced recipe, including the

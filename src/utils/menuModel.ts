@@ -41,10 +41,26 @@ export function parseDayName(name: string | null): { title: string | null; date:
     return match ? { title: match[1] || null, date: match[2] } : { title: name, date: null };
 }
 
+const LIST_START = /^\s*(?:[^:\n]+:\s*)?[-*+]\s/;
+const JOINED_BULLET = /\s+([-*+])(?=\s)/g;
+
+/**
+ * Cooklang joins consecutive lines into one step with spaces, unless they end
+ * with `\`. A meal that starts like a list (`- …` or `Lunch: - …`) was written
+ * as one, so a spaced bullet inside its text marks where a line was joined.
+ */
+function restoreJoinedList(parts: StepPart[]): StepPart[] {
+    const first = parts[0];
+    if (first?.type !== 'text' || !LIST_START.test(first.value)) return parts;
+    return parts.map(part => part.type === 'text'
+        ? { type: 'text', value: part.value.replace(JOINED_BULLET, '\n$1') }
+        : part);
+}
+
 /** Split step parts at newlines and drop list bullets and blank lines. */
 export function splitMealLines(parts: StepPart[]): StepPart[][] {
     const lines: StepPart[][] = [[]];
-    for (const part of parts) {
+    for (const part of restoreJoinedList(parts)) {
         if (part.type !== 'text') {
             lines[lines.length - 1].push(part);
             continue;

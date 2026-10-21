@@ -39,6 +39,25 @@ describe('menu model', () => {
         ]);
     });
 
+    it('restores lists whose lines Cooklang joined without backslashes', () => {
+        // Parser output for three `- @./…{}` lines without trailing `\`.
+        expect(splitMealLines([
+            text('- '), ingredient('Orange chicken'), text(' - '), ingredient('Schnitzel'), text(' - '), ingredient('Tacos'),
+        ])).toEqual([[ingredient('Orange chicken')], [ingredient('Schnitzel')], [ingredient('Tacos')]]);
+        expect(splitMealLines([text('Lunch: - '), ingredient('soup'), text(' - '), ingredient('bread')]))
+            .toEqual([[text('Lunch:')], [ingredient('soup')], [ingredient('bread')]]);
+    });
+
+    it('requires bullets for a list: items with only spaces between them stay on one line', () => {
+        expect(splitMealLines([ingredient('Orange chicken'), text(' '), ingredient('Tacos')]))
+            .toEqual([[ingredient('Orange chicken'), text(' '), ingredient('Tacos')]]);
+    });
+
+    it('keeps spaced dashes in meals that do not start as a list', () => {
+        expect(splitMealLines([ingredient('pasta'), text(' - gärna färsk')]))
+            .toEqual([[ingredient('pasta'), text(' - gärna färsk')]]);
+    });
+
     it('builds days with meal labels, notes and today', () => {
         const day = section('Day 1 (2026-10-21)',
             [text('Lunch: \n- '), ingredient('soup')],
