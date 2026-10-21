@@ -10,7 +10,21 @@
     import type { RecipeRenderModel } from '../types';
     import MenuPart from './MenuPart.svelte';
 
-    let { model, days }: { model: RecipeRenderModel; days: MenuDay[] } = $props();
+    import type { StepPart } from '../../utils/sectionHelpers';
+
+    let { model, days, images = {} }: { model: RecipeRenderModel; days: MenuDay[]; images?: Record<string, string> } = $props();
+
+    /** Main images of the recipes referenced on a line, shown above it. */
+    function lineImages(line: StepPart[]): { name: string; url: string }[] {
+        if (!model.settings.showImages) return [];
+        return line.flatMap(part => {
+            if (part.type !== 'ingredient' || !part.ingredient.reference) return [];
+            const { name, components } = part.ingredient.reference;
+            const resolved = model.host.resolveReference(model.file, { name, components: components ?? [], quantity: null, unit: null });
+            const url = resolved ? images[resolved.targetPath] : undefined;
+            return url ? [{ name, url }] : [];
+        });
+    }
     let unitMap = $derived(createUnitMap(
         model.settings.minutesLabel || DEFAULT_MINUTES_LABELS,
         model.settings.hoursLabel || DEFAULT_HOURS_LABELS,
@@ -50,7 +64,21 @@
                         {/if}
                         <ul class="cook-menu-items">
                             {#each entry.lines as line, lineIndex}
-                                <li class="cook-menu-item">
+                                {@const pictures = lineImages(line)}
+                                <li class:cook-menu-item-pictured={pictures.length > 0} class="cook-menu-item">
+                                    {#if pictures.length}
+                                        <div class="cook-menu-item-images">
+                                            {#each pictures as picture}
+                                                <img
+                                                    class="cook-menu-item-image"
+                                                    src={picture.url}
+                                                    alt={picture.name}
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                            {/each}
+                                        </div>
+                                    {/if}
                                     {#each line as part, partIndex}
                                         <MenuPart
                                             {model}

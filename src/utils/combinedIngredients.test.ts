@@ -94,10 +94,13 @@ describe('buildCombinedIngredients', () => {
             'Dough.cook': { yield: '3%balls', items: [{ name: 'flour', qty: 300, unit: 'g' }] },
             'Risotto.cook': { servings: 2, items: [{ name: 'flour', qty: 50, unit: 'g' }] },
         };
-        const list = await buildCombinedIngredients('Plan.menu', 'menu', 1, deps(files));
+        const visited: string[] = [];
+        const list = await buildCombinedIngredients('Plan.menu', 'menu', 1,
+            { ...deps(files), visit: path => { visited.push(path); } });
         // Pizza ×2, Dough ×2 (6 of 3 balls) within it: 300 g × 4 + 50 g of risotto flour.
         expect(quantities(list.rows)).toEqual({ cheese: '200 g', flour: '1.25 kg' });
         expect(list.dependencies).toEqual(['Mains/Pizza.cook', 'Dough.cook', 'Risotto.cook']);
+        expect(visited).toEqual(list.dependencies);
     });
 
     it('matches one of several yields', async () => {

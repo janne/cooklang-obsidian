@@ -185,7 +185,8 @@ reference under cursor** (or the editor's context menu), use Obsidian's **Follow
 link under cursor**, or press `gf` in Vim mode (including a `gf` mapped by Vimrc
 Support) to open the recipe at the reference's scale. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
-step as a meal, with links that open the referenced recipe already scaled. A
+step as a meal, with links that open the referenced recipe already scaled and,
+when images are enabled, each recipe's main image above its name. A
 meal written as a `- ` list shows one item per line, even without the trailing
 `\` Cooklang otherwise needs to keep lines apart. The
 plan comes first, beside the ingredients on wide panes and above them on phones.

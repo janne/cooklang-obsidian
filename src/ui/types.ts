@@ -63,6 +63,8 @@ export interface MenuRenderState {
     /** Local `YYYY-MM-DD`, so a dated day can be marked as today. */
     today: string;
     combined: CombinedIngredientsState;
+    /** Main image URL per referenced recipe path (sibling image file or `image` metadata). */
+    images: Record<string, string>;
 }
 
 export type EmbedRenderState =

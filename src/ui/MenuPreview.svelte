@@ -36,7 +36,7 @@
 <!-- The plan comes first: beside the ingredients on wide panes, above them when stacked. -->
 <div class:cook-cols-stacked={!model.settings.twoColumnLayout} class="cook-cols cook-menu-cols">
     <main class="cook-main">
-        <MenuDays {model} {days} />
+        <MenuDays {model} {days} images={menu.images} />
     </main>
     <aside class="cook-aside" aria-label="Combined ingredients">
         <IngredientList {model} {groups} title="Combined ingredients" sectionId="cook-combined">

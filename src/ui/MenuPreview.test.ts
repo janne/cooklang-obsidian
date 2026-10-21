@@ -53,7 +53,7 @@ function menuRecipe(): CooklangRecipe {
     } as unknown as CooklangRecipe;
 }
 
-function setup(combined: CombinedIngredientsState, scale = 1) {
+function setup(combined: CombinedIngredientsState, scale = 1, images: Record<string, string> = {}, showImages = true) {
     const openReference = vi.fn();
     const onIngredientToggle = vi.fn();
     const host: RecipeHostAdapter = {
@@ -70,7 +70,7 @@ function setup(combined: CombinedIngredientsState, scale = 1) {
         interactive: true,
         recipe: menuRecipe(),
         file: null,
-        settings: { showImages: true, showServingsScaler: true, twoColumnLayout: true, highlightIngredientCookware: true,
+        settings: { showImages, showServingsScaler: true, twoColumnLayout: true, highlightIngredientCookware: true,
             ingredientLabel: '', servingsLabel: '', metadataLabel: '', minutesLabel: '', hoursLabel: '', secondsLabel: '' } as CooklangSettings,
         state: { scale, baseServings: 2, displayServings: 2 * scale, checkedIngredients: new Set(), currentStep: -1 },
         callbacks: { onScaleChange: vi.fn(), onIngredientToggle, onStepActivate: vi.fn() },
@@ -80,7 +80,7 @@ function setup(combined: CombinedIngredientsState, scale = 1) {
     // CookViewRoot provides the `.cook-rich` scope the bar's section links search.
     const target = document.body.appendChild(document.createElement('div'));
     target.className = 'cook-rich';
-    render(MenuPreview, { target, props: { model, menu: { today: '2026-10-21', combined } } });
+    render(MenuPreview, { target, props: { model, menu: { today: '2026-10-21', combined, images } } });
     return { openReference, onIngredientToggle };
 }
 
@@ -128,5 +128,21 @@ describe('MenuPreview', () => {
         const plan = screen.getByRole('heading', { name: 'Plan' });
         const combined = screen.getByRole('heading', { name: 'Combined ingredients' });
         expect(plan.compareDocumentPosition(combined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('shows each referenced recipe\'s image above it when images are enabled', () => {
+        setup({ status: 'loading' }, 1, { 'Granola.cook': 'https://example.com/granola.jpg' });
+        const image = screen.getByRole('img', { name: 'Granola' }) as HTMLImageElement;
+        expect(image.src).toBe('https://example.com/granola.jpg');
+        expect(image.getAttribute('loading')).toBe('lazy');
+        const item = image.closest('li')!;
+        expect(image.compareDocumentPosition(within(item).getByRole('link', { name: 'Granola' }))
+            & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.queryByRole('img', { name: 'Risotto' })).toBeNull();
+        cleanup();
+        document.body.replaceChildren();
+
+        setup({ status: 'loading' }, 1, { 'Granola.cook': 'https://example.com/granola.jpg' }, false);
+        expect(screen.queryByRole('img')).toBeNull();
     });
 });

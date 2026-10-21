@@ -16,13 +16,15 @@ import { aggregateIngredients, type AggInput, type IngredientRow, type RecipeRef
 import { ingredientToAggInput } from './ingredientRows';
 import { resolveReferenceScale } from './scaling';
 
-export type CombinedRecipe = Pick<CooklangRecipe, 'ingredients' | 'servings' | 'rawMetadata'>;
+export type CombinedRecipe = Pick<CooklangRecipe, 'ingredients' | 'servings' | 'rawMetadata' | 'images'>;
 
 export interface CombinedIngredientsDeps {
     parse(source: string, scale: number): CombinedRecipe;
     read(path: string): Promise<string>;
     /** Vault path of a referenced recipe, or null when it does not exist. */
     resolve(reference: RecipeRefTarget, fromPath: string): string | null;
+    /** Called once per referenced recipe read, with its unscaled parse (e.g. for its image). */
+    visit?(path: string, recipe: CombinedRecipe): void;
 }
 
 export interface CombinedIngredientProblem {
@@ -118,8 +120,9 @@ export async function buildCombinedIngredients(
                 problems.push({ name, reason: 'recipe could not be read' });
                 continue;
             }
-            dependencies.add(target);
             const child = deps.parse(childSource, 1);
+            if (!dependencies.has(target)) deps.visit?.(target, child);
+            dependencies.add(target);
             const result = resolveReferenceScale(
                 request.quantity === null ? null : { quantity: request.quantity, unit: request.unit },
                 child.servings,

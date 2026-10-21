@@ -9,7 +9,9 @@ import { writable } from 'svelte/store';
 import CookViewRoot from './ui/CookViewRoot.svelte';
 import type { CombinedIngredientsState, MenuRenderState, RecipeHostAdapter, RecipeRenderModel } from './ui/types';
 import { isMenuFile, recipeName } from './utils/recipeFiles';
-import { buildCombinedIngredients } from './utils/combinedIngredients';
+import { buildCombinedIngredients, type CombinedRecipe } from './utils/combinedIngredients';
+import { findRecipeImages } from './utils/imageHelpers';
+import { getRecipeImageUrls } from './utils/recipeImages';
 import { localDateKey } from './utils/menuModel';
 
 const COMBINED_REFRESH_DELAY = 250;
@@ -21,7 +23,12 @@ export class CookView extends TextFileView {
     private disposed = false;
     private currentSession: RecipeSession | null = null;
     /** A menu's combined ingredients, keyed by path, scale and source. */
-    private combined: { key: string; state: CombinedIngredientsState; dependencies: Set<string> } | null = null;
+    private combined: {
+        key: string;
+        state: CombinedIngredientsState;
+        dependencies: Set<string>;
+        images: Record<string, string>;
+    } | null = null;
     private combinedGeneration = 0;
     private combinedRefresh: number | null = null;
 
@@ -136,7 +143,8 @@ export class CookView extends TextFileView {
         const { baseServings, displayServings } = deriveServingsState(
             parseServingsValue(isMenu ? baseRecipe.servings ?? undefined : baseRecipe.servings), session.scale);
         const menu: MenuRenderState | undefined = isMenu && this.file
-            ? { today: localDateKey(new Date()), combined: this.combinedState(this.file, this.data, session.scale) }
+            ? { today: localDateKey(new Date()), combined: this.combinedState(this.file, this.data, session.scale),
+                images: this.combined?.images ?? {} }
             : undefined;
         this.previewStore.set({
             instanceId: session.instanceId, interactive: true, recipe, file: this.file, menu,
@@ -169,10 +177,11 @@ export class CookView extends TextFileView {
         const generation = ++this.combinedGeneration;
         const state: CombinedIngredientsState = this.combined?.state.status === 'ready'
             ? this.combined.state : { status: 'loading' };
-        this.combined = { key, state, dependencies: this.combined?.dependencies ?? new Set() };
+        this.combined = { key, state, dependencies: this.combined?.dependencies ?? new Set(), images: this.combined?.images ?? {} };
+        const images: Record<string, string> = {};
         const finish = (next: CombinedIngredientsState, dependencies: string[]): void => {
             if (this.disposed || generation !== this.combinedGeneration) return;
-            this.combined = { key, state: next, dependencies: new Set(dependencies) };
+            this.combined = { key, state: next, dependencies: new Set(dependencies), images };
             this.renderPreview();
         };
         buildCombinedIngredients(file.path, source, scale, {
@@ -183,11 +192,22 @@ export class CookView extends TextFileView {
                 return this.app.vault.cachedRead(target);
             },
             resolve: reference => this.host.resolveReference(file, reference)?.targetPath ?? null,
+            visit: (path, recipe) => {
+                const image = this.recipeImageUrl(path, recipe);
+                if (image) images[path] = image;
+            },
         }).then(
             list => finish({ status: 'ready', list }, list.dependencies),
             error => finish({ status: 'error', message: error instanceof Error ? error.message : String(error) }, []),
         );
         return state;
+    }
+
+    /** As in the recipe's own header: a sibling image file first, then `image` metadata. */
+    private recipeImageUrl(path: string, recipe: CombinedRecipe): string | null {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        const sibling = file instanceof TFile ? findRecipeImages(file).mainImage : null;
+        return sibling ? this.app.vault.getResourcePath(sibling) : getRecipeImageUrls(recipe.images)[0] ?? null;
     }
 
     private refreshCombined(): void {
