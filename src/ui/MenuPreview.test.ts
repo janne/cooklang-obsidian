@@ -13,7 +13,10 @@ vi.mock('@cooklang/cooklang', () => ({
     quantity_display: (quantity: { display?: string }) => quantity.display ?? '',
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    document.body.replaceChildren();
+});
 
 const number = (value: number, unit: string | null, display: string) =>
     ({ value: { type: 'number', value: { type: 'regular', value } }, unit, display });
@@ -74,7 +77,10 @@ function setup(combined: CombinedIngredientsState, scale = 1) {
         host,
         timers: null,
     };
-    render(MenuPreview, { model, menu: { today: '2026-10-21', combined } });
+    // CookViewRoot provides the `.cook-rich` scope the bar's section links search.
+    const target = document.body.appendChild(document.createElement('div'));
+    target.className = 'cook-rich';
+    render(MenuPreview, { target, props: { model, menu: { today: '2026-10-21', combined } } });
     return { openReference, onIngredientToggle };
 }
 
@@ -107,7 +113,9 @@ describe('MenuPreview', () => {
             dependencies: [],
         } });
 
-        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('section')!;
+        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('details')!;
+        expect(combined.open).toBe(true);
+        expect(within(combined).getByText('2')).toBeTruthy();
         expect(within(combined).getByText('600 g')).toBeTruthy();
         expect(within(combined).getByRole('heading', { name: 'Optional' })).toBeTruthy();
         expect(screen.getByText('Salads/Boring')).toBeTruthy();
@@ -115,5 +123,17 @@ describe('MenuPreview', () => {
 
         await fireEvent.click(within(combined).getByRole('checkbox', { name: 'Check rice' }));
         expect(onIngredientToggle).toHaveBeenCalledWith('rice');
+    });
+
+    it('puts the plan before the ingredients and reopens a collapsed list from the bar', async () => {
+        setup({ status: 'loading' });
+        const plan = screen.getByRole('heading', { name: 'Plan' });
+        const combined = screen.getByRole('heading', { name: 'Combined ingredients' }).closest('details')!;
+        expect(plan.compareDocumentPosition(combined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        combined.open = false;
+        Element.prototype.scrollIntoView = vi.fn();
+        await fireEvent.click(screen.getByRole('link', { name: 'Ingredients' }));
+        expect(combined.open).toBe(true);
     });
 });

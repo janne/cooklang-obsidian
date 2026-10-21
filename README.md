@@ -176,6 +176,8 @@ Dinner: \
 Menus are edited in Obsidian's native editor with Cooklang highlighting. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
 step as a meal, with links that open the referenced recipe already scaled. The
+plan comes first, beside the ingredients on wide panes and above them on phones.
+The
 **Combined ingredients** list expands every referenced recipe, including the
 recipes they reference, and merges quantities:
 
@@ -184,7 +186,8 @@ recipes they reference, and merges quantities:
   (one when it has none).
 - `@./Sauce{150%ml}` scales to a matching `yield` entry; a unit without a
   matching yield is listed under **Not included** rather than guessed.
-- The servings scaler multiplies every reference and loose ingredient in the plan.
+- The servings scaler multiplies every reference and loose ingredient in the plan;
+  a menu without `servings` counts as one serving.
 - Optional items (`@?`) are listed separately and are not expanded.
 
 The combined list is read-only and is not saved; CookCLI's `.shopping-list`

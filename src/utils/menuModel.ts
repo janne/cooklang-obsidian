@@ -118,3 +118,4 @@ export function menuReferenceAmount(target: RecipeRefTarget): string | null {
     const amount = formatQuantity(target.quantity);
     return target.unit?.trim() ? `${amount} ${target.unit.trim()}` : `×${amount}`;
 }
+

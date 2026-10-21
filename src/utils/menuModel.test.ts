@@ -66,4 +66,5 @@ describe('menu model', () => {
         expect(menuReferenceAmount(menuReferenceTarget(risotto, null, 1))).toBeNull();
         expect(menuReferenceTarget(risotto, null, 1.5)).toMatchObject({ quantity: 1.5, unit: null });
     });
+
 });

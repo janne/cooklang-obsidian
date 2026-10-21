@@ -9,6 +9,7 @@
         groups: providedGroups,
         title,
         sectionId = 'cook-ingredients',
+        heading = true,
         empty,
     }: {
         model: RecipeRenderModel;
@@ -16,6 +17,8 @@
         groups?: IngredientDisplayGroup[];
         title?: string;
         sectionId?: string;
+        /** False when a surrounding disclosure summary already names the list. */
+        heading?: boolean;
         /** Shown in the section when there are no rows; without it the section is omitted. */
         empty?: Snippet;
     } = $props();
@@ -24,7 +27,9 @@
 
 {#if groups.length || empty}
     <section class="cook-ingredients" id={sectionId}>
-        <h2 class="cook-section-title">{title ?? (model.settings.ingredientLabel || 'Ingredients')}</h2>
+        {#if heading}
+            <h2 class="cook-section-title">{title ?? (model.settings.ingredientLabel || 'Ingredients')}</h2>
+        {/if}
         {#if !groups.length}{@render empty?.()}{/if}
         {#each groups as group, groupIndex}
             {#if group.name}

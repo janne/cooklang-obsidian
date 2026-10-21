@@ -130,9 +130,12 @@ export class CookView extends TextFileView {
             session.pendingReferenceScale = null;
             [recipe] = parserService.parse(this.data, session.scale);
         }
+        const isMenu = !!this.file && isMenuFile(this.file.path);
+        // The parser reports absent servings as null. A menu then counts as one serving,
+        // so its scale always has a visible control acting as the plan multiplier.
         const { baseServings, displayServings } = deriveServingsState(
-            parseServingsValue(baseRecipe.servings), session.scale);
-        const menu: MenuRenderState | undefined = this.file && isMenuFile(this.file.path)
+            parseServingsValue(isMenu ? baseRecipe.servings ?? undefined : baseRecipe.servings), session.scale);
+        const menu: MenuRenderState | undefined = isMenu && this.file
             ? { today: localDateKey(new Date()), combined: this.combinedState(this.file, this.data, session.scale) }
             : undefined;
         this.previewStore.set({
