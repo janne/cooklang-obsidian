@@ -570,7 +570,7 @@
 // Menus put the plan first: on the left when wide, above the ingredients when stacked.
 .cook-menu-cols > .cook-aside { margin-top: var(--size-4-6, 24px); }
 @container (min-width: 600px) {
-  .cook-menu-cols:not(.cook-cols-stacked) { grid-template-columns: 1fr 240px; }
+  .cook-menu-cols:not(.cook-cols-stacked) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cook-menu-cols:not(.cook-cols-stacked) > .cook-aside { margin-top: 0; }
 }
 .cook-menu-combined > summary {
