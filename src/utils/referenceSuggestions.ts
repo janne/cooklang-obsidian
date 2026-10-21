@@ -7,19 +7,26 @@
 import { recipeStem } from './recipeFiles';
 
 export interface ReferenceQuery {
-    /** Column where `./` starts; the replacement keeps the `@` or `@?` before it. */
+    /** Column after `@` or `@?`; the replacement keeps that marker. */
     start: number;
-    /** Text typed after `./`. */
+    /** Text typed after the marker, without a leading `./`. */
     query: string;
 }
 
-const OPEN_REFERENCE = /@\??(\.\/[^{}\n]*)$/;
+const REFERENCE = /@\??(\.\/[^{}@\n]*)$/;
+// A bare `@` at the start of a word. The query ends at an amount being typed or another `@`.
+const BARE_REFERENCE = /(?:^|\s)@\??((?:\.\/)?[^{}@\n]*)$/;
 
-/** The reference being typed at the end of `lineBeforeCursor`, if any. */
-export function findReferenceQuery(lineBeforeCursor: string): ReferenceQuery | null {
-    const match = OPEN_REFERENCE.exec(lineBeforeCursor);
+/**
+ * The reference being typed at the end of `lineBeforeCursor`, if any. Recipes
+ * require `@./`, since a bare `@` is nearly always an ingredient there; menus
+ * mostly reference recipes, so `bare` also accepts a plain `@`.
+ */
+export function findReferenceQuery(lineBeforeCursor: string, bare = false): ReferenceQuery | null {
+    const match = (bare ? BARE_REFERENCE : REFERENCE).exec(lineBeforeCursor);
     if (!match) return null;
-    return { start: lineBeforeCursor.length - match[1].length, query: match[1].slice(2) };
+    const typed = match[1];
+    return { start: lineBeforeCursor.length - typed.length, query: typed.replace(/^\.\//, '') };
 }
 
 /** `Recept/Mac & Cheese.cook.cook` becomes `./Recept/Mac & Cheese.cook`. */
@@ -27,7 +34,7 @@ export function referencePathFor(filePath: string): string {
     return `./${recipeStem(filePath)}`;
 }
 
-/** Text replacing `./query`: braces are added unless the source already has them. */
+/** Text replacing what follows `@`: braces are added unless the source already has them. */
 export function referenceInsertion(filePath: string, textAfterCursor: string): { text: string; cursorOffset: number } {
     const path = referencePathFor(filePath);
     return textAfterCursor.startsWith('{')

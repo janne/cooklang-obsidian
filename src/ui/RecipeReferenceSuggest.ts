@@ -10,7 +10,7 @@ import {
 import { isMenuFile, isRecipeFile, recipeName, recipeStem } from '../utils/recipeFiles';
 import { findReferenceQuery, rankReferenceCandidates, referenceInsertion } from '../utils/referenceSuggestions';
 
-/** Autocompletes `@./` recipe references in recipes and menus, on desktop and mobile. */
+/** Autocompletes recipe references (`@` in menus, `@./` in recipes), on desktop and mobile. */
 export class RecipeReferenceSuggest extends EditorSuggest<TFile> {
     constructor(app: App) {
         super(app);
@@ -19,7 +19,7 @@ export class RecipeReferenceSuggest extends EditorSuggest<TFile> {
 
     onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null): EditorSuggestTriggerInfo | null {
         if (!file || !this.isRecipe(file)) return null;
-        const reference = findReferenceQuery(editor.getLine(cursor.line).slice(0, cursor.ch));
+        const reference = findReferenceQuery(editor.getLine(cursor.line).slice(0, cursor.ch), isMenuFile(file.path));
         return reference
             ? { start: { line: cursor.line, ch: reference.start }, end: cursor, query: reference.query }
             : null;

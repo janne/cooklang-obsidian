@@ -4,8 +4,20 @@ import { findReferenceQuery, rankReferenceCandidates, referenceInsertion, refere
 describe('reference suggestions', () => {
     it('finds the reference being typed, including optional references', () => {
         expect(findReferenceQuery('- @./')).toEqual({ start: 3, query: '' });
+        expect(findReferenceQuery('- @gno')).toBeNull();
         expect(findReferenceQuery('Lunch @./Recept/Krämig gn')).toEqual({ start: 7, query: 'Recept/Krämig gn' });
         expect(findReferenceQuery('@?./sauce')).toEqual({ start: 2, query: 'sauce' });
+    });
+
+    it('accepts a bare @ at the start of a word for menus', () => {
+        expect(findReferenceQuery('- @', true)).toEqual({ start: 3, query: '' });
+        expect(findReferenceQuery('@krämig gn', true)).toEqual({ start: 1, query: 'krämig gn' });
+        expect(findReferenceQuery('- @./Recept/gno', true)).toEqual({ start: 3, query: 'Recept/gno' });
+        expect(findReferenceQuery('@?chili', true)).toEqual({ start: 2, query: 'chili' });
+        expect(findReferenceQuery('mail me@home', true)).toBeNull();
+        expect(findReferenceQuery('@lingonsylt{1', true)).toBeNull();
+        expect(findReferenceQuery('@apples and @gno', true)).toEqual({ start: 13, query: 'gno' });
+        expect(findReferenceQuery('@./A and @./gno')).toEqual({ start: 10, query: 'gno' });
     });
 
     it('ignores finished references, plain ingredients and email-like text', () => {
