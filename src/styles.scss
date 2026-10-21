@@ -593,6 +593,9 @@
 .cook-menu-problem-list { margin: 0; padding-left: 1.2em; color: var(--text-muted); font-size: 0.85em; }
 .cook-menu-problem-name { color: var(--text-error); font-weight: 600; }
 
+/* `@./` recipe reference autocomplete */
+.cook-reference-suggestion-path { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+
 /* Embedded ```cook blocks in markdown notes (#73) */
 .cook-embed {
   margin: var(--size-4-2, 8px) 0;

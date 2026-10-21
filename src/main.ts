@@ -27,6 +27,7 @@ import { RecipeViewRouter } from './services/RecipeViewRouter';
 import { convertRecipe, synchronizeRecipeBuffers } from './services/RecipeConversion';
 import { RecipeFormatModal } from './ui/RecipeFormatModal';
 import { RecipeEmbedChild } from './ui/RecipeEmbedChild';
+import { RecipeReferenceSuggest } from './ui/RecipeReferenceSuggest';
 import { wholeRecipeEmbedRoot, WholeRecipeEmbedRegistry } from './utils/wholeRecipeEmbeds';
 import { nativeCookEditor } from './mode/cook/nativeEditor';
 import { isRecipeSource } from './utils/recipeSource';
@@ -100,6 +101,7 @@ export default class CookPlugin extends Plugin {
     this.registerView("cook", this.cookViewCreator);
     this.registerExtensions(["cook", "menu"], "markdown");
     this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
+    this.registerEditorSuggest(new RecipeReferenceSuggest(this.app));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
     // compact, read-only recipe (#73).

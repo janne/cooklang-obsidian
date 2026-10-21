@@ -173,7 +173,10 @@ Dinner: \
 - @./Risotto{2}
 ```
 
-Menus are edited in Obsidian's native editor with Cooklang highlighting. The
+Menus are edited in Obsidian's native editor with Cooklang highlighting. Typing
+`@./` in a menu or recipe suggests recipes from the vault (`@./gno` finds
+*Krämig gnocchi*); choosing one inserts `@./Recept/Krämig gnocchi med salsiccia{}`
+with the cursor inside the braces, ready for an amount such as `2%servings`. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
 step as a meal, with links that open the referenced recipe already scaled. The
 plan comes first, beside the ingredients on wide panes and above them on phones.
