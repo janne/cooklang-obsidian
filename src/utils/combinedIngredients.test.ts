@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildCombinedIngredients, type CombinedIngredientsDeps, type CombinedRecipe } from './combinedIngredients';
+import { buildCombinedIngredients, sortRowsByName, type CombinedIngredientsDeps, type CombinedRecipe } from './combinedIngredients';
 
 vi.mock('@cooklang/cooklang', () => ({
     ingredient_should_be_listed: () => true,
@@ -138,5 +138,25 @@ describe('buildCombinedIngredients', () => {
         expect(list.rows).toEqual([]);
         expect(list.optional.map(row => row.name)).toEqual(['chilli', 'Risotto']);
         expect(d.reads).toEqual([]);
+    });
+
+    it('sorts combined and optional rows alphabetically', async () => {
+        const files = {
+            menu: { items: [
+                { name: 'salt' }, { name: 'Apples', qty: 2 }, { name: 'zest', optional: true },
+                { name: 'basil', optional: true }, { name: '', ref: 'Risotto' },
+            ] },
+            'Risotto.cook': risotto,
+        };
+        const list = await buildCombinedIngredients('Plan.menu', 'menu', 1, deps(files));
+        expect(list.rows.map(row => row.name)).toEqual(['Apples', 'rice', 'salt', 'stock']);
+        expect(list.optional.map(row => row.name)).toEqual(['basil', 'zest']);
+    });
+
+    it('sorts in the locale, ignoring case and comparing numbers by value', () => {
+        const row = (name: string) => ({ name, displayQty: null, preparations: [], reference: null });
+        const names = (list: string[], locale: string) => sortRowsByName(list.map(row), locale).map(entry => entry.name);
+        expect(names(['äpple', 'Zucchini', 'apelsin', 'ört'], 'sv')).toEqual(['apelsin', 'Zucchini', 'äpple', 'ört']);
+        expect(names(['egg 10', 'egg 9'], 'en')).toEqual(['egg 9', 'egg 10']);
     });
 });

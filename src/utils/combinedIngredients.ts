@@ -5,7 +5,8 @@
  * factor using the Cooklang conventions (`{2}` doubles, `{6%servings}` divides
  * by the target's servings, other units match its `yield`). Factors multiply
  * through nesting, and the menu's own scale multiplies everything. Optional
- * items (`@?`) are kept apart and their references are not expanded.
+ * items (`@?`) are kept apart and their references are not expanded. Rows are
+ * sorted by name, as a shopping list is scanned rather than read in order.
  *
  * Pure: parsing, vault reads and reference resolution are injected.
  */
@@ -38,6 +39,15 @@ export interface CombinedIngredients {
 }
 
 export const MAX_REFERENCE_DEPTH = 8;
+
+/**
+ * Alphabetical in the given or system locale (so Swedish puts å, ä, ö after z),
+ * ignoring case and comparing numbers by value.
+ */
+export function sortRowsByName(rows: IngredientRow[], locale?: string): IngredientRow[] {
+    const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
+    return [...rows].sort((a, b) => collator.compare(a.name, b.name));
+}
 
 function isOptional(ingredient: Ingredient): boolean {
     return /\bOPT\b/.test(ingredient.modifiers ?? '');
@@ -125,8 +135,8 @@ export async function buildCombinedIngredients(
 
     await visit(path, source, scale, [path]);
     return {
-        rows: aggregateIngredients(items),
-        optional: aggregateIngredients(optional),
+        rows: sortRowsByName(aggregateIngredients(items)),
+        optional: sortRowsByName(aggregateIngredients(optional)),
         problems,
         dependencies: [...dependencies],
     };

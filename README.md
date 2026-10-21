@@ -191,7 +191,7 @@ meal written as a `- ` list shows one item per line, even without the trailing
 plan comes first, beside the ingredients on wide panes and above them on phones.
 The
 **Combined ingredients** list expands every referenced recipe, including the
-recipes they reference, and merges quantities:
+recipes they reference, merges quantities, and lists them alphabetically:
 
 - `@./Risotto{2}` makes twice the recipe; `@./Risotto{}` makes it as written.
 - `@./Risotto{6%servings}` scales by six divided by the recipe's `servings`
