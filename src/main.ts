@@ -11,6 +11,8 @@ import {
   Notice,
   TextFileView,
   type Editor,
+  HoverPopover,
+  Keymap,
   type HoverParent,
   type MarkdownFileInfo,
   parseYaml,
@@ -61,6 +63,7 @@ export default class CookPlugin extends Plugin {
   private sessions!: RecipeSessions<WorkspaceLeaf, RecipeSession>;
   private routeTimeout: number | null = null;
   private routingReady = false;
+  private referenceHover: { parent: HoverParent; path: string; popover: HoverPopover } | null = null;
 
   saveData(data: CooklangSettings): Promise<void> {
     const settings = { ...data } as CooklangSettings & { lineWrap?: unknown };
@@ -397,16 +400,32 @@ export default class CookPlugin extends Plugin {
     this.recipeHost.openReference(resolved);
   };
 
-  /** Page preview on hover, with the same modifier rules as an editor `[[link]]`. */
+  /**
+   * Mod+hover shows the recipe in a popover, like an editor `[[link]]` preview.
+   * Obsidian's page preview cannot render `.cook` files, so the popover holds
+   * the plugin's compact, read-only recipe render instead.
+   */
   private hoverSourceReference = (sourcePath: string, target: RecipeRefTarget, event: MouseEvent,
       targetEl: HTMLElement, info: MarkdownFileInfo | null): void => {
+    if (!Keymap.isModEvent(event)) return;
     const source = this.app.vault.getAbstractFileByPath(sourcePath);
     const resolved = this.recipeHost.resolveReference(source instanceof TFile ? source : null, target);
-    if (!resolved) return;
-    const hoverParent: HoverParent = info && 'hoverPopover' in info ? info as unknown as HoverParent : { hoverPopover: null };
-    this.app.workspace.trigger('hover-link', {
-      event, source: 'editor', hoverParent, targetEl, linktext: resolved.targetPath, sourcePath,
-    });
+    const file = resolved && this.app.vault.getAbstractFileByPath(resolved.targetPath);
+    if (!(file instanceof TFile)) return;
+    const parent: HoverParent = info && 'hoverPopover' in info ? info as unknown as HoverParent : { hoverPopover: null };
+    // Moving between the spans of one reference fires mouseover repeatedly; keep its popover.
+    const current = this.referenceHover;
+    if (current?.parent === parent && current.path === file.path && current.popover.hoverEl.isConnected) return;
+
+    const popover = new HoverPopover(parent, targetEl);
+    this.referenceHover = { parent, path: file.path, popover };
+    popover.hoverEl.addClass('cook-hover-popover');
+    const content = popover.hoverEl.createDiv({ cls: 'cook-hover-content' });
+    const child = new RecipeEmbedChild(content, content, this.app, file, () => this.settings, this.recipeHost, undefined,
+      () => this.renderChildren.delete(child));
+    this.renderChildren.add(child);
+    popover.addChild(child);
+    void child.refresh();
   };
 
   private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {
