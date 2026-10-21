@@ -21,7 +21,8 @@ import { ObsidianRecipeHost } from './ui/ObsidianRecipeHost';
 import changelog from '../CHANGELOG.md';
 import { ChangelogModal } from './ui/ChangelogModal';
 import { releaseNotesForUpdate } from './utils/releaseNotes';
-import { isRecipeFile, newRecipeContent, recipeFormat, recipeConversionPath, RECIPE_FORMATS, type RecipeFormat } from './utils/recipeFiles';
+import { cooklangFormat, isMenuFile, isRecipeFile, menuFormatFor, newMenuContent, newRecipeContent, recipeFormat, recipeConversionPath,
+  RECIPE_FORMATS, type RecipeFormat } from './utils/recipeFiles';
 import { RecipeViewRouter } from './services/RecipeViewRouter';
 import { convertRecipe, synchronizeRecipeBuffers } from './services/RecipeConversion';
 import { RecipeFormatModal } from './ui/RecipeFormatModal';
@@ -93,10 +94,11 @@ export default class CookPlugin extends Plugin {
 
     // register a custom icon
     this.addDocumentIcon("cook");
+    this.addMenuIcon();
 
     // register the view and extensions
     this.registerView("cook", this.cookViewCreator);
-    this.registerExtensions(["cook"], "markdown");
+    this.registerExtensions(["cook", "menu"], "markdown");
     this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
@@ -125,7 +127,8 @@ export default class CookPlugin extends Plugin {
     const embeds = new WholeRecipeEmbedRegistry();
     this.registerMarkdownPostProcessor(async (el, ctx) => {
       const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
-      if (!(file instanceof TFile) || file.extension !== 'md'
+      // Menus are left as Markdown in transclusions; only recipes get the compact embed.
+      if (!(file instanceof TFile) || file.extension !== 'md' || isMenuFile(file.path)
           || !isRecipeFile(file.path, ctx.frontmatter ?? this.app.metadataCache.getFileCache(file)?.frontmatter)) return;
       const root = await wholeRecipeEmbedRoot(el);
       if (!root || this.disposed) return;
@@ -214,9 +217,17 @@ export default class CookPlugin extends Plugin {
                 this.app.workspace.getLeaf().openFile(newFile);
               });
           });
+          menu.addItem(item => item
+            .setTitle('New menu')
+            .setIcon('document-menu')
+            .setSection('action-primary')
+            .onClick(async () => {
+              const newFile = await this.menuFileCreator(file.path);
+              await this.app.workspace.getLeaf().openFile(newFile);
+            }));
         }
 
-        if (file instanceof TFile && (file.extension === 'md' || file.extension === 'cook')) {
+        if (file instanceof TFile && cooklangFormat(file.path)) {
           menu.addItem(item => item
             .setTitle('Open as Recipe')
             .setIcon('document-cook')
@@ -227,7 +238,7 @@ export default class CookPlugin extends Plugin {
 
     this.registerEvent(this.app.workspace.on('editor-menu', (menu, _editor, view) => {
       const file = view.file;
-      if (file && (file.extension === 'md' || file.extension === 'cook')) {
+      if (file && cooklangFormat(file.path)) {
         menu.addItem(item => item
           .setTitle('Open as Recipe')
           .setIcon('document-cook')
@@ -259,6 +270,15 @@ export default class CookPlugin extends Plugin {
       callback: async () => {
         const newFile = await this.cookFileCreator();
         await this.app.workspace.getLeaf(true).openFile(newFile);
+      }
+    })
+
+    this.addCommand({
+      id: "create-menu",
+      name: "Create new menu",
+      callback: async () => {
+        const newFile = await this.menuFileCreator();
+        await this.app.workspace.getLeaf().openFile(newFile);
       }
     })
 
@@ -317,7 +337,7 @@ export default class CookPlugin extends Plugin {
         const file = this.app.workspace.getActiveFile();
         const leaf = this.app.workspace.activeLeaf;
         
-        if (!file || !leaf || (file.extension !== 'md' && file.extension !== 'cook')) return false;
+        if (!file || !leaf || !cooklangFormat(file.path)) return false;
         
         // Only show if currently in markdown view
         if (checking) return leaf.view.getViewType() === 'markdown';
@@ -459,6 +479,15 @@ export default class CookPlugin extends Plugin {
   }
 
   cookFileCreator = async (folderPath?: string) => {
+    const format = this.settings.defaultRecipeFormat;
+    return this.createUntitledFile(format, newRecipeContent(format), folderPath);
+  }
+
+  menuFileCreator = async (folderPath?: string) => {
+    return this.createUntitledFile(menuFormatFor(this.settings.defaultRecipeFormat), newMenuContent(), folderPath);
+  }
+
+  private createUntitledFile = async (format: string, content: string, folderPath?: string) => {
     // Default to root folder
     let newFileFolderPath = '';
 
@@ -477,13 +506,12 @@ export default class CookPlugin extends Plugin {
     if (newFileFolderPath && !newFileFolderPath.endsWith('/')) newFileFolderPath += '/';
 
     const originalPath = newFileFolderPath;
-    const format = this.settings.defaultRecipeFormat;
     newFileFolderPath = `${newFileFolderPath}Untitled.${format}`;
     let i = 0;
     while(this.app.vault.getAbstractFileByPath(newFileFolderPath)) {
       newFileFolderPath = `${originalPath}Untitled ${++i}.${format}`;
     }
-    const newFile = await this.app.vault.create(newFileFolderPath, newRecipeContent(format));
+    const newFile = await this.app.vault.create(newFileFolderPath, content);
     return newFile;
   }
 
@@ -500,6 +528,18 @@ export default class CookPlugin extends Plugin {
         leaf.view.updateSettings(this.settings);
       }
     });
+  }
+
+  // A dish under a list of days, for meal plans.
+  addMenuIcon = () => {
+    addIcon('document-menu', `
+    <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30 52C38.8366 52 46 44.8366 46 36H14C14 44.8366 21.1634 52 30 52Z" fill="currentColor"/>
+    <rect x="12" y="8" width="36" height="5" rx="2.5" fill="currentColor"/>
+    <rect x="12" y="18" width="36" height="5" rx="2.5" fill="currentColor"/>
+    <rect x="12" y="28" width="24" height="5" rx="2.5" fill="currentColor"/>
+    </svg>
+    `);
   }
 
   // this function provides the icon for the document

@@ -1,23 +1,40 @@
 export type RecipeFormat = 'cook' | 'cook.md' | 'md';
+export type MenuFormat = 'menu' | 'menu.md';
+export type CooklangFormat = RecipeFormat | MenuFormat;
 
 export const RECIPE_FORMATS: RecipeFormat[] = ['cook', 'cook.md', 'md'];
 
-export function recipeFormat(path: string): RecipeFormat | null {
+/** Compound suffixes first, so `Week.menu.md` is a menu rather than a Markdown note. */
+export function cooklangFormat(path: string): CooklangFormat | null {
     if (path.endsWith('.cook.md')) return 'cook.md';
+    if (path.endsWith('.menu.md')) return 'menu.md';
     if (path.endsWith('.cook')) return 'cook';
+    if (path.endsWith('.menu')) return 'menu';
     if (path.endsWith('.md')) return 'md';
     return null;
 }
 
+/** The convertible recipe format; menus are not recipes and have no conversion. */
+export function recipeFormat(path: string): RecipeFormat | null {
+    const format = cooklangFormat(path);
+    return format === 'menu' || format === 'menu.md' ? null : format;
+}
+
+export function isMenuFile(path: string): boolean {
+    const format = cooklangFormat(path);
+    return format === 'menu' || format === 'menu.md';
+}
+
+/** Any Cooklang document the plugin edits and previews: recipes and menus. */
 export function isRecipeFile(path: string, frontmatter?: unknown): boolean {
-    const format = recipeFormat(path);
-    return format === 'cook' || format === 'cook.md'
+    const format = cooklangFormat(path);
+    return format === 'cook' || format === 'cook.md' || format === 'menu' || format === 'menu.md'
         || (format === 'md' && !!frontmatter && typeof frontmatter === 'object'
             && 'recipe' in frontmatter && frontmatter.recipe === true);
 }
 
 export function recipeStem(path: string): string {
-    const format = recipeFormat(path);
+    const format = cooklangFormat(path);
     return format ? path.slice(0, -(format.length + 1)) : path;
 }
 
@@ -31,6 +48,18 @@ export function recipeConversionPath(path: string, target: RecipeFormat): string
 
 export function newRecipeContent(format: RecipeFormat): string {
     return format === 'cook' ? '' : '---\nrecipe: true\n---\n\n';
+}
+
+/** Menus follow the recipe preference: plain `.cook` files pair with `.menu`. */
+export function menuFormatFor(recipe: RecipeFormat): MenuFormat {
+    return recipe === 'cook' ? 'menu' : 'menu.md';
+}
+
+/** The compound suffix marks a menu, so neither format needs a property. */
+export function newMenuContent(): string {
+    return '---\nservings: 2\n---\n\n'
+        + '-- Reference recipes from the vault root, e.g. @./Folder/Recipe{2%servings} or @./Recipe{2}\n\n'
+        + '== Day 1 ==\n\nDinner: \\\n- \n';
 }
 
 /** Canonical names first, followed by the pre-existing compound basename. */

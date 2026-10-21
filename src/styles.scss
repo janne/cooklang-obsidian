@@ -532,6 +532,45 @@
 .cook-more-list li { padding: 3px 0; color: var(--text-muted); font-size: 0.85em; }
 .cook-more-key { font-weight: 600; color: var(--text-normal); margin-right: 6px; text-transform: capitalize; }
 
+/* Meal plans (.menu) */
+.cook-menu-plan,
+#cook-combined { scroll-margin-top: 64px; }
+.cook-menu-day {
+  scroll-margin-top: 64px;
+  padding: var(--size-4-3, 12px) var(--size-4-4, 16px);
+  margin: 0 0 var(--size-4-3, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+}
+.cook-menu-day.cook-menu-today {
+  border-color: var(--interactive-accent);
+  box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+.cook-menu-day-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--size-2-2, 6px) var(--size-4-2, 8px);
+  margin-bottom: var(--size-2-3, 8px);
+}
+.cook-menu-day-title { margin: 0; font-size: 1.05em; line-height: 1.3; }
+.cook-menu-day-date { color: var(--text-faint); font-size: 0.8em; font-variant-numeric: tabular-nums; }
+.cook-menu-today-badge {
+  padding: 1px 8px; border-radius: 999px; font-size: 0.75em; font-weight: 700;
+  background: var(--interactive-accent); color: var(--text-on-accent);
+}
+.cook-menu-meal + .cook-menu-meal { margin-top: var(--size-4-2, 8px); }
+.cook-menu-meal-label {
+  margin: 0 0 2px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-faint); font-weight: 700;
+}
+.cook-menu-items { margin: 0; padding-left: 1.2em; line-height: 1.6; }
+.cook-menu-item { overflow-wrap: anywhere; }
+.cook-menu-ref .cook-amt,
+.cook-menu-item .cook-amt { color: var(--text-muted); font-size: 0.9em; font-variant-numeric: tabular-nums; }
+.cook-menu-status { margin: 0; color: var(--text-muted); font-size: 0.9em; }
+.cook-menu-problems { margin-top: var(--size-4-3, 12px); }
+.cook-menu-problem-list { margin: 0; padding-left: 1.2em; color: var(--text-muted); font-size: 0.85em; }
+.cook-menu-problem-name { color: var(--text-error); font-weight: 600; }
+
 /* Embedded ```cook blocks in markdown notes (#73) */
 .cook-embed {
   margin: var(--size-4-2, 8px) 0;

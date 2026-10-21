@@ -8,7 +8,7 @@ Use the current source, tests, and build configuration as the source of truth. T
 
 ## Project overview
 
-Cooklang Editor is a TypeScript Obsidian plugin for editing and rendering Cooklang recipes. It supports `.cook` files, Markdown files whose frontmatter contains the Boolean `recipe: true`, and fenced `cook`/`cooklang` blocks rendered by a Markdown reading-mode postprocessor. Rollup produces a CommonJS Obsidian bundle from `src/main.ts`.
+Cooklang Editor is a TypeScript Obsidian plugin for editing and rendering Cooklang recipes. It supports `.cook` files, Markdown files whose frontmatter contains the Boolean `recipe: true`, meal-plan menus (`.menu` and `.menu.md`), and fenced `cook`/`cooklang` blocks rendered by a Markdown reading-mode postprocessor. Rollup produces a CommonJS Obsidian bundle from `src/main.ts`.
 
 - Runtime baseline: Obsidian 1.8.0 or newer.
 - Supported platforms: desktop and mobile (`isDesktopOnly` is `false`). Do not add Node-only runtime assumptions.
@@ -76,7 +76,8 @@ fenced `cook` / `cooklang` block in Markdown reading mode
 - Scaling intentionally parses twice: parse with the current scale for displayed quantities, and parse unscaled data to derive base servings. Never derive base servings from an already scaled recipe.
 - Section step tracking uses one global zero-based index across the recipe. Step-image filenames are one-based: `Recipe.1.jpg` is the first step. Convert between them explicitly where needed.
 - Recipe images are siblings of the recipe. The main image shares its basename; step images add a numeric suffix. Use `app.vault.getResourcePath()` for display URLs.
-- Recipe references resolve relative to their source recipe or, for fenced blocks, the host Markdown note. They prefer `.cook` and may fall back to `.md` only when its frontmatter has the Boolean `recipe: true`.
+- Recipe references resolve from the vault root, which acts as the Cooklang recipes root. They prefer `.cook`, may fall back to `.md` only when its frontmatter has the Boolean `recipe: true`, and finally try `.cook.md`.
+- Menus reuse the `cook` view type and sessions; `CookView` adds a `menu` render state and `CookViewRoot` renders `MenuPreview`. Combined ingredients are computed by the pure `utils/combinedIngredients.ts` with injected parsing and vault reads, following the conventions in `utils/scaling.ts` (`resolveReferenceScale`); factors multiply through nested references and the menu's own scale.
 - Markdown embeds inherit most user settings, but `embedSettings()` deliberately disables images, live timers, step tracking, and the two-column layout without mutating the shared settings object.
 - Preserve navigation behavior for frontmatter-detected Markdown recipes: the transient view switch uses `sync: true` so Back returns to the previous note.
 - Dispose timers/intervals and audio resources, destroy editors, and unregister lifecycle resources through Obsidian APIs.

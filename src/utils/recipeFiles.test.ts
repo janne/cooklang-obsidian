@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { convertRecipeContent, isRecipeFile, newRecipeContent, recipeConversionPath, recipeFormat,
+import { convertRecipeContent, cooklangFormat, isMenuFile, isRecipeFile, menuFormatFor, newMenuContent, newRecipeContent, recipeConversionPath, recipeFormat,
     recipeImageBasenames, recipeName, type RecipeFormat } from './recipeFiles';
 import { getRecipeStepImage } from './stepImages';
 import { getRecipeMainImage } from './recipeImages';
@@ -12,6 +12,25 @@ describe('recipe file formats', () => {
         ['Dinner.md', undefined, false], ['Dinner.txt', { recipe: true }, false],
     ])('recognizes %s with %j', (path, metadata, expected) => {
         expect(isRecipeFile(path, metadata)).toBe(expected);
+    });
+
+    it('recognizes menus without a property and never offers to convert them', () => {
+        for (const path of ['Plans/Week 1.menu', 'Plans/Week 1.menu.md']) {
+            expect(isRecipeFile(path)).toBe(true);
+            expect(isMenuFile(path)).toBe(true);
+            expect(recipeFormat(path)).toBeNull();
+            expect(recipeName(path)).toBe('Week 1');
+        }
+        expect(cooklangFormat('Plans/Week.menu.md')).toBe('menu.md');
+        expect(isMenuFile('Dinner.cook')).toBe(false);
+        expect(isMenuFile('menu.md')).toBe(false);
+    });
+
+    it('pairs the menu format with the recipe preference', () => {
+        expect(menuFormatFor('cook')).toBe('menu');
+        expect(menuFormatFor('cook.md')).toBe('menu.md');
+        expect(menuFormatFor('md')).toBe('menu.md');
+        expect(newMenuContent()).toContain('== Day 1 ==');
     });
 
     it('treats the compound suffix as one format, including names containing dots', () => {

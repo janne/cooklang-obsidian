@@ -38,7 +38,7 @@ interface ParsedYield {
     unit: string;
 }
 
-function parseYieldValue(value: unknown): ParsedYield | null {
+function parseYieldEntry(value: unknown): ParsedYield | null {
     if (typeof value !== 'string') return null;
     const match = value.match(/^\s*(\d+(?:\.\d+)?)\s*(?:%|\s)\s*(\S.*?)\s*$/);
     if (!match) return null;
@@ -48,28 +48,65 @@ function parseYieldValue(value: unknown): ParsedYield | null {
         : null;
 }
 
+/** `yield` is one `number%unit` value or a list of them (`[500%ml, 350%g]`). */
+function parseYieldValues(value: unknown): ParsedYield[] {
+    if (Array.isArray(value)) return value.map(parseYieldEntry).filter((entry): entry is ParsedYield => entry !== null);
+    if (typeof value === 'string' && /^\s*\[.*\]\s*$/.test(value)) {
+        return parseYieldValues(value.trim().slice(1, -1).split(','));
+    }
+    const entry = parseYieldEntry(value);
+    return entry ? [entry] : [];
+}
+
 function normalizedUnit(unit: string): string {
     return unit.trim().toLowerCase().replace(/s$/, '');
 }
 
-/** Resolve a reference quantity to the scale factor for the target recipe. */
-export function computeReferenceScale(
+export type ReferenceScaleResult =
+    | { ok: true; factor: number }
+    | { ok: false; reason: string };
+
+/**
+ * Scale factor for a referenced recipe, following the Cooklang conventions:
+ * no unit multiplies the recipe, `%servings` divides by the target's servings
+ * (default 1), and any other unit must match one of the target's `yield`
+ * entries; otherwise the reference is an error.
+ * https://cooklang.org/docs/conventions/#scaling-referenced-recipes
+ */
+export function resolveReferenceScale(
     request: RecipeReferenceScaleRequest | null,
-    servings: Servings | undefined,
+    servings: Servings | null | undefined,
     yieldValue: unknown,
-): number {
-    if (!request || !Number.isFinite(request.quantity) || request.quantity <= 0) return 1;
-    if (!request.unit?.trim()) return request.quantity;
+): ReferenceScaleResult {
+    if (!request) return { ok: true, factor: 1 };
+    if (!Number.isFinite(request.quantity) || request.quantity <= 0) {
+        return { ok: false, reason: 'the reference quantity is not a positive number' };
+    }
+    if (!request.unit?.trim()) return { ok: true, factor: request.quantity };
 
     if (normalizedUnit(request.unit) === 'serving') {
-        const baseServings = parseServingsValue(servings);
-        return baseServings === null ? 1 : computeScale(request.quantity, baseServings);
+        // The parser reports absent servings as null; recipes default to one serving.
+        const baseServings = parseServingsValue(servings ?? undefined);
+        return baseServings === null
+            ? { ok: false, reason: 'the recipe has no numeric servings' }
+            : { ok: true, factor: computeScale(request.quantity, baseServings) };
     }
 
-    const parsedYield = parseYieldValue(yieldValue);
-    return parsedYield && normalizedUnit(parsedYield.unit) === normalizedUnit(request.unit)
-        ? request.quantity / parsedYield.quantity
-        : 1;
+    const unit = normalizedUnit(request.unit);
+    const match = parseYieldValues(yieldValue).find(entry => normalizedUnit(entry.unit) === unit);
+    return match
+        ? { ok: true, factor: request.quantity / match.quantity }
+        : { ok: false, reason: `the recipe has no yield in ${request.unit.trim()}` };
+}
+
+/** Lenient variant for opening a reference: unresolved requests open the recipe as written. */
+export function computeReferenceScale(
+    request: RecipeReferenceScaleRequest | null,
+    servings: Servings | null | undefined,
+    yieldValue: unknown,
+): number {
+    const result = resolveReferenceScale(request, servings, yieldValue);
+    return result.ok ? result.factor : 1;
 }
 
 /** Clamp a servings count within sane bounds without discarding fractions. */

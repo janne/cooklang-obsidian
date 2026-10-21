@@ -1,4 +1,5 @@
 <script lang="ts">
+    import MenuPreview from './MenuPreview.svelte';
     import RecipePreview from './RecipePreview.svelte';
     import type { CookViewRootProps } from './types';
 
@@ -9,7 +10,9 @@
     class="cook-preview-view"
     class:cook-rich={$preview !== null}
 >
-    {#if $preview}
+    {#if $preview?.menu}
+        <MenuPreview model={$preview} menu={$preview.menu} />
+    {:else if $preview}
         <RecipePreview model={$preview} />
     {/if}
 </div>

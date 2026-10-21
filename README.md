@@ -151,6 +151,45 @@ recipe: true
 This works in full recipe views, whole-note recipe embeds, and embedded
 `cook`/`cooklang` blocks. Reference paths remain relative to the vault root.
 
+## Meal plans (`.menu`)
+
+A [Cooklang menu](https://cooklang.org/docs/conventions/#menu-files) is a Cooklang
+file that composes a meal plan from recipe references. Store it as `Week 1.menu`
+or, to keep it a Markdown note, `Week 1.menu.md`; both are recognized by their
+filename. Use the **Create new menu** command or **New menu** in a folder's context
+menu to start one.
+
+```cooklang
+---
+servings: 2
+---
+
+== Monday (2026-03-07) ==
+
+Breakfast: \
+- @./Breakfast/Granola{2%servings} with @yogurt{200%g}
+
+Dinner: \
+- @./Risotto{2}
+```
+
+Menus are edited in Obsidian's native editor with Cooklang highlighting. The
+preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
+step as a meal, with links that open the referenced recipe already scaled. The
+**Combined ingredients** list expands every referenced recipe, including the
+recipes they reference, and merges quantities:
+
+- `@./Risotto{2}` makes twice the recipe; `@./Risotto{}` makes it as written.
+- `@./Risotto{6%servings}` scales by six divided by the recipe's `servings`
+  (one when it has none).
+- `@./Sauce{150%ml}` scales to a matching `yield` entry; a unit without a
+  matching yield is listed under **Not included** rather than guessed.
+- The servings scaler multiplies every reference and loose ingredient in the plan.
+- Optional items (`@?`) are listed separately and are not expanded.
+
+The combined list is read-only and is not saved; CookCLI's `.shopping-list`
+files are not read or written.
+
 ## Security
 > Third-party plugins can access files on your computer, connect to the internet, and even install additional programs.
 

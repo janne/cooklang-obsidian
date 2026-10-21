@@ -2,7 +2,13 @@
     import { clampServings } from '../../utils/scaling';
     import type { RecipeRenderModel } from '../types';
 
-    let { model }: { model: RecipeRenderModel } = $props();
+    interface BarLink { selector: string; label: string; }
+
+    let { model, links }: { model: RecipeRenderModel; links?: BarLink[] } = $props();
+    let navLinks = $derived(links ?? [
+        { selector: '#cook-ingredients', label: model.settings.ingredientLabel || 'Ingredients' },
+        { selector: '#cook-steps', label: model.settings.methodLabel || 'Steps' },
+    ]);
     let showScaler = $derived(
         model.settings.showServingsScaler
         && model.state.baseServings !== null
@@ -20,12 +26,11 @@
 
 <nav class="cook-bar" aria-label="Recipe sections and servings">
     <div class="cook-bar-nav">
-        <a class="cook-bar-link" href="#cook-ingredients" onclick={(event) => scrollTo(event, '#cook-ingredients')}>
-            {model.settings.ingredientLabel || 'Ingredients'}
-        </a>
-        <a class="cook-bar-link" href="#cook-steps" onclick={(event) => scrollTo(event, '#cook-steps')}>
-            {model.settings.methodLabel || 'Steps'}
-        </a>
+        {#each navLinks as link}
+            <a class="cook-bar-link" href={link.selector} onclick={(event) => scrollTo(event, link.selector)}>
+                {link.label}
+            </a>
+        {/each}
     </div>
 
     {#if showScaler && model.state.displayServings !== null}

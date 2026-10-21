@@ -1,3 +1,5 @@
+import { cooklangFormat } from '../utils/recipeFiles';
+
 export interface RecipeLeaf {
     getViewState(): { type: string; state?: Record<string, unknown> };
 }
@@ -48,7 +50,7 @@ export class RecipeViewRouter<L extends RecipeLeaf> {
         if (this.automatic.get(leaf) !== path) this.automatic.delete(leaf);
         if (this.pending.has(leaf)) { this.reroute.add(leaf); return; }
         if (this.seen.get(leaf) !== path) this.seen.delete(leaf);
-        if ((!path.endsWith('.md') && !path.endsWith('.cook')) || this.suspended.has(path)) return;
+        if (!cooklangFormat(path) || this.suspended.has(path)) return;
         const recognized = this.recognized(path, leaf);
         if (recognized === undefined) return;
         const fresh = this.seen.get(leaf) !== path;
