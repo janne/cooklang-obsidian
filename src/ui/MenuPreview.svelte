@@ -38,7 +38,8 @@
     <main class="cook-main">
         <MenuDays {model} {days} images={menu.images} />
     </main>
-    <aside class="cook-aside" aria-label="Combined ingredients">
+    <!-- No aria-label: Obsidian shows it as a hover tooltip, and the heading names the list. -->
+    <aside class="cook-aside">
         <IngredientList {model} {groups} title="Combined ingredients" sectionId="cook-combined">
             {#snippet empty()}
                 <p class="cook-menu-status">

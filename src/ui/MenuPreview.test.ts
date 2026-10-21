@@ -130,19 +130,27 @@ describe('MenuPreview', () => {
         expect(plan.compareDocumentPosition(combined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('shows each referenced recipe\'s image above it when images are enabled', () => {
-        setup({ status: 'loading' }, 1, { 'Granola.cook': 'https://example.com/granola.jpg' });
-        const image = screen.getByRole('img', { name: 'Granola' }) as HTMLImageElement;
-        expect(image.src).toBe('https://example.com/granola.jpg');
+    it('shows each referenced recipe\'s image above it when images are enabled', async () => {
+        const { openReference } = setup({ status: 'loading' }, 2, { 'Granola.cook': 'https://example.com/granola.jpg' });
+        const images = document.querySelectorAll<HTMLImageElement>('.cook-menu-item-image');
+        expect([...images].map(image => image.src)).toEqual(['https://example.com/granola.jpg']);
+        const image = images[0];
         expect(image.getAttribute('loading')).toBe('lazy');
         const item = image.closest('li')!;
         expect(image.compareDocumentPosition(within(item).getByRole('link', { name: 'Granola' }))
             & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(screen.queryByRole('img', { name: 'Risotto' })).toBeNull();
+
+        // Tapping the image opens the recipe like its link (the fixture's amounts are already plan-scaled).
+        const imageLink = image.closest('a')!;
+        expect(imageLink.getAttribute('tabindex')).toBe('-1');
+        await fireEvent.click(image);
+        expect(openReference).toHaveBeenLastCalledWith(expect.objectContaining({
+            targetPath: 'Granola.cook', scaleRequest: { quantity: 4, unit: 'servings' },
+        }));
         cleanup();
         document.body.replaceChildren();
 
         setup({ status: 'loading' }, 1, { 'Granola.cook': 'https://example.com/granola.jpg' }, false);
-        expect(screen.queryByRole('img')).toBeNull();
+        expect(document.querySelector('.cook-menu-item-image')).toBeNull();
     });
 });

@@ -582,8 +582,9 @@
 // A pictured item drops its bullet; the image above the name marks it instead.
 .cook-menu-item-pictured { list-style: none; margin: var(--size-4-2, 8px) 0 var(--size-4-3, 12px) -1.2em; }
 .cook-menu-item-images { display: flex; gap: var(--size-4-2, 8px); margin-bottom: var(--size-2-2, 6px); }
+.cook-menu-item-image-link { display: flex; flex: 1 1 0; min-width: 0; }
 .cook-menu-item-image {
-  flex: 1 1 0; min-width: 0; max-width: 100%;
+  width: 100%; max-width: 100%;
   aspect-ratio: 2 / 1; object-fit: cover;
   border-radius: var(--radius-m, 8px);
   background: var(--background-secondary);

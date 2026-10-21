@@ -11,19 +11,31 @@
     import MenuPart from './MenuPart.svelte';
 
     import type { StepPart } from '../../utils/sectionHelpers';
+    import { menuReferenceTarget } from '../../utils/menuModel';
+    import { numericFromQuantity } from '../../utils/quantityValue';
+    import type { ResolvedRecipeReference } from '../types';
 
     let { model, days, images = {} }: { model: RecipeRenderModel; days: MenuDay[]; images?: Record<string, string> } = $props();
 
-    /** Main images of the recipes referenced on a line, shown above it. */
-    function lineImages(line: StepPart[]): { name: string; url: string }[] {
+    /** Main images of the recipes referenced on a line, opening them like their links. */
+    function lineImages(line: StepPart[]): { url: string; resolved: ResolvedRecipeReference }[] {
         if (!model.settings.showImages) return [];
         return line.flatMap(part => {
             if (part.type !== 'ingredient' || !part.ingredient.reference) return [];
-            const { name, components } = part.ingredient.reference;
-            const resolved = model.host.resolveReference(model.file, { name, components: components ?? [], quantity: null, unit: null });
+            const quantity = part.ingredient.quantity;
+            const value = quantity ? numericFromQuantity(quantity) : null;
+            const target = menuReferenceTarget(part.ingredient.reference,
+                value === null ? null : { value, unit: quantity?.unit ?? null }, model.state.scale);
+            const resolved = model.host.resolveReference(model.file, target);
             const url = resolved ? images[resolved.targetPath] : undefined;
-            return url ? [{ name, url }] : [];
+            return resolved && url ? [{ url, resolved }] : [];
         });
+    }
+
+    function open(event: MouseEvent, resolved: ResolvedRecipeReference): void {
+        event.preventDefault();
+        event.stopPropagation();
+        model.host.openReference(resolved);
     }
     let unitMap = $derived(createUnitMap(
         model.settings.minutesLabel || DEFAULT_MINUTES_LABELS,
@@ -68,14 +80,23 @@
                                 <li class:cook-menu-item-pictured={pictures.length > 0} class="cook-menu-item">
                                     {#if pictures.length}
                                         <div class="cook-menu-item-images">
+                                            <!-- The recipe's text link below carries its name and keyboard focus. -->
                                             {#each pictures as picture}
-                                                <img
-                                                    class="cook-menu-item-image"
-                                                    src={picture.url}
-                                                    alt={picture.name}
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                />
+                                                <a
+                                                    class="cook-menu-item-image-link"
+                                                    href={picture.resolved.targetPath}
+                                                    tabindex="-1"
+                                                    aria-hidden="true"
+                                                    onclick={event => open(event, picture.resolved)}
+                                                >
+                                                    <img
+                                                        class="cook-menu-item-image"
+                                                        src={picture.url}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                </a>
                                             {/each}
                                         </div>
                                     {/if}
