@@ -28,6 +28,7 @@ import { RecipeFormatModal } from './ui/RecipeFormatModal';
 import { RecipeEmbedChild } from './ui/RecipeEmbedChild';
 import { wholeRecipeEmbedRoot, WholeRecipeEmbedRegistry } from './utils/wholeRecipeEmbeds';
 import { nativeCookEditor } from './mode/cook/nativeEditor';
+import { ScreenWakeLock } from './services/ScreenWakeLock';
 import { isRecipeSource } from './utils/recipeSource';
 import { RecipeSessions, type RecipeSession } from './services/RecipeSessions';
 import { TimerService } from './services/TimerService';
@@ -183,6 +184,28 @@ export default class CookPlugin extends Plugin {
       routeLeaves();
     }));
     this.registerEvent(this.app.vault.on('delete', file => this.sessions.delete(file.path)));
+
+    // Keep the screen awake while a recipe preview is on screen; previews in
+    // background tabs do not count.
+    const wakeLock = new ScreenWakeLock('wakeLock' in navigator ? navigator.wakeLock : undefined,
+      () => document.visibilityState === 'visible');
+    let wakeLockCheck = 0;
+    const updateWakeLock = () => {
+      window.clearTimeout(wakeLockCheck);
+      // Let the workspace finish showing and hiding tabs before checking.
+      wakeLockCheck = window.setTimeout(() => wakeLock.setWanted(!this.disposed
+        && this.app.workspace.getLeavesOfType('cook')
+          .some(leaf => leaf.view instanceof CookView && leaf.view.containerEl.isShown())));
+    };
+    this.register(() => {
+      window.clearTimeout(wakeLockCheck);
+      wakeLock.dispose();
+    });
+    this.registerEvent(this.app.workspace.on('active-leaf-change', updateWakeLock));
+    this.registerEvent(this.app.workspace.on('layout-change', updateWakeLock));
+    this.registerEvent(this.app.workspace.on('file-open', updateWakeLock));
+    this.registerDomEvent(document, 'visibilitychange', () => wakeLock.handleVisibilityChange());
+    this.app.workspace.onLayoutReady(updateWakeLock);
     this.app.workspace.onLayoutReady(() => {
       if (this.disposed) return;
       // Default view applies to new navigation, not restored native source tabs.
