@@ -422,7 +422,7 @@ export default class CookPlugin extends Plugin {
     popover.hoverEl.addClass('cook-hover-popover');
     const content = popover.hoverEl.createDiv({ cls: 'cook-hover-content' });
     const child = new RecipeEmbedChild(content, content, this.app, file, () => this.settings, this.recipeHost, undefined,
-      () => this.renderChildren.delete(child));
+      () => this.renderChildren.delete(child), 'hover');
     this.renderChildren.add(child);
     popover.addChild(child);
     void child.refresh();

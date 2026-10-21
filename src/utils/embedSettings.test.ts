@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { CooklangSettings } from '../settings';
-import { embedSettings } from './embedSettings';
+import { embedSettings, hoverPreviewSettings } from './embedSettings';
 
 function makeSettings(overrides: Partial<CooklangSettings> = {}): CooklangSettings {
     return {
@@ -56,5 +56,13 @@ describe('embedSettings', () => {
         expect(base.showTimersInline).toBe(true);
         expect(base.twoColumnLayout).toBe(true);
         expect(base.showImages).toBe(true);
+    });
+});
+
+describe('hoverPreviewSettings', () => {
+    it('keeps embed restrictions but follows the image setting', () => {
+        const withImages = hoverPreviewSettings(makeSettings({ showImages: true }));
+        expect(withImages).toMatchObject({ showImages: true, enableStepTracking: false, showTimersInline: false, twoColumnLayout: false });
+        expect(hoverPreviewSettings(makeSettings({ showImages: false })).showImages).toBe(false);
     });
 });

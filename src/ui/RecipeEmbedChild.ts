@@ -6,7 +6,8 @@ import type { CooklangSettings } from '../settings';
 import type { EmbedRenderState, RecipeHostAdapter } from './types';
 import { parserService } from '../services/ParserService';
 import { RecipeEmbedSession } from '../services/RecipeEmbedSession';
-import { embedSettings } from '../utils/embedSettings';
+import { embedSettings, hoverPreviewSettings } from '../utils/embedSettings';
+import { parseServingsValue } from '../utils/scaling';
 import { isRecipeFile } from '../utils/recipeFiles';
 import { createUiInstanceId } from './instanceIds';
 
@@ -23,26 +24,32 @@ export class RecipeEmbedChild extends MarkdownRenderChild {
         host: RecipeHostAdapter,
         private source?: string,
         private cleanup: () => void = () => {},
+        /** `hover` adds the recipe header (title, description, pills, image) for previews. */
+        variant: 'embed' | 'hover' = 'embed',
     ) {
         super(container);
         const renderState = writable<EmbedRenderState>({ status: 'loading' });
         const instanceId = createUiInstanceId('cook-embed');
         this.component = mount(RecipeEmbed, {
             target,
-            props: { renderState, wholeNote: source === undefined },
+            props: { renderState, wholeNote: source === undefined, header: variant === 'hover' },
         });
         this.session = new RecipeEmbedSession({
             read: () => source !== undefined ? Promise.resolve(source)
                 : file ? app.vault.read(file) : Promise.reject(new Error('Recipe file is missing.')),
             initialize: () => parserService.initialize(),
             parse: text => parserService.parse(text)[0],
-            model: recipe => ({
-                instanceId, interactive: false, recipe, file,
-                settings: embedSettings(settings()), host, timers: null,
-                state: { scale: 1, baseServings: null, displayServings: null,
-                    checkedIngredients: new Set<string>(), currentStep: -1 },
-                callbacks: { onScaleChange: () => {}, onIngredientToggle: () => {}, onStepActivate: () => {} },
-            }),
+            model: recipe => {
+                // The header's servings pill reads displayServings; plain embeds have no header.
+                const servings = variant === 'hover' ? parseServingsValue(recipe.servings) : null;
+                return {
+                    instanceId, interactive: false, recipe, file,
+                    settings: variant === 'hover' ? hoverPreviewSettings(settings()) : embedSettings(settings()), host, timers: null,
+                    state: { scale: 1, baseServings: servings, displayServings: servings,
+                        checkedIngredients: new Set<string>(), currentStep: -1 },
+                    callbacks: { onScaleChange: () => {}, onIngredientToggle: () => {}, onStepActivate: () => {} },
+                };
+            },
             publish: state => renderState.set(state),
         });
     }

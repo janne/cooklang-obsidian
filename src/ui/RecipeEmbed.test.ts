@@ -91,5 +91,17 @@ describe('RecipeEmbed', () => {
             targetPath: file.path, sourcePath: file.path, scaleRequest: null,
         });
         expect(view.container.querySelector('.cook-bar')).toBeNull();
+
+        // Hover previews show the full preview's header instead of the title link.
+        renderState.set({ status: 'ready', model: {
+            ...model, file, recipe: { ...model.recipe, title: 'Gravad lax', description: 'Klassiskt gravad lax.' },
+            state: { ...model.state, displayServings: 8 },
+        } as unknown as RecipeRenderModel });
+        await view.rerender({ renderState, wholeNote: true, header: true });
+        expect(await screen.findByRole('heading', { name: 'Gravad lax' })).toBeTruthy();
+        expect(view.container.querySelector('.cook-hero')).toBeTruthy();
+        expect(screen.getByText('Klassiskt gravad lax.')).toBeTruthy();
+        expect(screen.getByText(/8 servings/)).toBeTruthy();
+        expect(screen.queryByRole('link', { name: 'Dinner' })).toBeNull();
     });
 });

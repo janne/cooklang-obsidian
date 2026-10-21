@@ -610,11 +610,16 @@
 
 /* Mod+hover preview of a recipe reference in the editor */
 .cook-hover-content {
+  // A container, so the hero's narrow-pane rules stack the image above the title.
+  container-type: inline-size;
   box-sizing: border-box;
   max-height: 450px;
   overflow-y: auto;
   padding: var(--size-4-2, 8px) var(--size-4-4, 16px);
 }
+.cook-hover-content .cook-hero { padding: var(--size-4-2, 8px) 0 var(--size-4-3, 12px); gap: var(--size-4-3, 12px); }
+.cook-hover-content .cook-hero-title { font-size: 1.4em; }
+.cook-hover-content .cook-hero-image img { max-height: 180px; }
 
 /* `@./` recipe reference autocomplete */
 .cook-reference-suggestion-path { color: var(--text-muted); font-size: var(--font-ui-smaller); }
