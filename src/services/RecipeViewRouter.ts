@@ -2,6 +2,9 @@ export interface RecipeLeaf {
     getViewState(): { type: string; state?: Record<string, unknown> };
 }
 
+const SWITCH_RETRY_MS = 50;
+const SWITCH_ATTEMPTS = 20;
+
 /** Session-only routing choices; no view state or file content is persisted here. */
 export class RecipeViewRouter<L extends RecipeLeaf> {
     private native = new WeakMap<L, string>();
@@ -17,6 +20,7 @@ export class RecipeViewRouter<L extends RecipeLeaf> {
         private switchView: (leaf: L, type: 'cook' | 'markdown', path: string, isCurrent: () => boolean) => Promise<void>,
         private onError: (error: unknown) => void,
         private defaultView: () => 'source' | 'preview' = () => 'source',
+        private retryDelay: () => Promise<void> = () => new Promise(resolve => setTimeout(resolve, SWITCH_RETRY_MS)),
     ) {}
 
     editAsMarkdown(leaf: L, path: string): void {
@@ -75,9 +79,26 @@ export class RecipeViewRouter<L extends RecipeLeaf> {
             // Allow concurrent navigation/metadata events to settle, then verify the target.
             await Promise.resolve();
             if (!isCurrent()) return;
-            if (type === 'cook') this.automatic.set(leaf, path);
-            else this.automatic.delete(leaf);
-            await this.switchView(leaf, type, path, isCurrent);
+            const switched = () => {
+                const current = leaf.getViewState();
+                return type === 'cook' ? current.type === 'cook'
+                    : current.type === 'markdown' && current.state?.mode === 'source' && current.state?.source === true;
+            };
+            // Obsidian silently ignores setViewState while the leaf is still opening the file.
+            for (let attempt = 1; ; attempt++) {
+                if (type === 'cook') this.automatic.set(leaf, path);
+                else this.automatic.delete(leaf);
+                await this.switchView(leaf, type, path, isCurrent);
+                if (switched() || !isCurrent()) break;
+                if (attempt === SWITCH_ATTEMPTS) {
+                    // Let the next workspace event try again instead of treating the file as handled.
+                    this.automatic.delete(leaf);
+                    if (fresh) this.seen.delete(leaf);
+                    break;
+                }
+                await this.retryDelay();
+                if (!isCurrent()) break;
+            }
         } catch (error) {
             this.automatic.delete(leaf);
             this.onError(error);
