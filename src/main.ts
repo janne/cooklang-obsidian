@@ -10,6 +10,7 @@ import {
   MarkdownPostProcessorContext,
   Notice,
   TextFileView,
+  type Editor,
   parseYaml,
   stringifyYaml,
 } from 'obsidian';
@@ -36,6 +37,15 @@ import { TimerService } from './services/TimerService';
 import timerMp3 from './timer.mp3';
 import type { RecipeReferenceScaleRequest } from './utils/scaling';
 import { createUiInstanceId } from './ui/instanceIds';
+import type { RecipeRefTarget } from './utils/ingredientAggregator';
+import { referenceAt, type SourceReference } from './utils/sourceReferences';
+
+/** The parts of Obsidian's bundled CodeMirror Vim API used for `gf`. */
+interface VimApi {
+  defineAction(name: string, action: () => void): void;
+  mapCommand(keys: string, type: 'action', name: string, args: object, extra: { context: 'normal' }): void;
+  unmap(keys: string, context: 'normal'): void;
+}
 
 export default class CookPlugin extends Plugin {
 
@@ -100,7 +110,7 @@ export default class CookPlugin extends Plugin {
     // register the view and extensions
     this.registerView("cook", this.cookViewCreator);
     this.registerExtensions(["cook", "menu"], "markdown");
-    this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
+    this.registerEditorExtension(nativeCookEditor(this.routeLeaves, this.openSourceReference));
     this.registerEditorSuggest(new RecipeReferenceSuggest(this.app));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
@@ -199,6 +209,7 @@ export default class CookPlugin extends Plugin {
       });
       this.routingReady = true;
       routeLeaves();
+      this.registerVimFollow();
     });
 
     this.addSettingTab(new CookSettingsTab(this.app, this));
@@ -238,8 +249,15 @@ export default class CookPlugin extends Plugin {
       })
     );
 
-    this.registerEvent(this.app.workspace.on('editor-menu', (menu, _editor, view) => {
+    this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, view) => {
       const file = view.file;
+      const reference = this.referenceUnderCursor(editor, file);
+      if (file && reference) {
+        menu.addItem(item => item
+          .setTitle('Open recipe reference')
+          .setIcon('document-cook')
+          .onClick(() => this.openSourceReference(file.path, reference.target)));
+      }
       if (file && cooklangFormat(file.path)) {
         menu.addItem(item => item
           .setTitle('Open as Recipe')
@@ -274,6 +292,18 @@ export default class CookPlugin extends Plugin {
         await this.app.workspace.getLeaf(true).openFile(newFile);
       }
     })
+
+    this.addCommand({
+      id: 'open-recipe-reference',
+      name: 'Open recipe reference under cursor',
+      editorCheckCallback: (checking, editor, ctx) => {
+        const file = ctx.file;
+        const reference = this.referenceUnderCursor(editor, file);
+        if (!file || !reference) return false;
+        if (!checking) this.openSourceReference(file.path, reference.target);
+        return true;
+      },
+    });
 
     this.addCommand({
       id: "create-menu",
@@ -350,6 +380,53 @@ export default class CookPlugin extends Plugin {
     });
 
     await this.showReleaseNotesAfterUpdate(isFirstInstall);
+  }
+
+  /** Follows a `@./…{…}` reference like a preview link, including its scale. */
+  private openSourceReference = (sourcePath: string, target: RecipeRefTarget): void => {
+    const source = this.app.vault.getAbstractFileByPath(sourcePath);
+    const resolved = this.recipeHost.resolveReference(source instanceof TFile ? source : null, target);
+    if (!resolved) {
+      const path = [...target.components.filter(part => part && part !== '.'), target.name].join('/');
+      new Notice(`Recipe not found: ${path}`);
+      return;
+    }
+    this.recipeHost.openReference(resolved);
+  };
+
+  private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {
+    if (!file || !isRecipeSource(file.path, editor.getValue(), parseYaml)) return null;
+    const cursor = editor.getCursor();
+    return referenceAt(editor.getLine(cursor.line), cursor.ch);
+  }
+
+  /**
+   * In Vim mode, `gf` opens the recipe reference under the cursor and otherwise
+   * follows the link under the cursor as Obsidian would. The Vim API is only
+   * reachable through Obsidian's global CodeMirror adapter.
+   */
+  private registerVimFollow(): void {
+    const vim = (window as unknown as { CodeMirrorAdapter?: { Vim?: VimApi } }).CodeMirrorAdapter?.Vim;
+    if (this.disposed || !vim) return;
+    vim.defineAction('cooklangFollowReference', () => {
+      const active = this.app.workspace.activeEditor;
+      const file = active?.file ?? null;
+      const reference = active?.editor ? this.referenceUnderCursor(active.editor, file) : null;
+      if (file && reference) {
+        this.openSourceReference(file.path, reference.target);
+        return;
+      }
+      const commands = (this.app as unknown as { commands?: { executeCommandById(id: string): boolean } }).commands;
+      commands?.executeCommandById('editor:follow-link');
+    });
+    vim.mapCommand('gf', 'action', 'cooklangFollowReference', {}, { context: 'normal' });
+    this.register(() => {
+      try {
+        vim.unmap('gf', 'normal');
+      } catch {
+        // Another plugin or a vimrc may already have replaced the mapping.
+      }
+    });
   }
 
   private reportError(message: string, error: unknown): void {

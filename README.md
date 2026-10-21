@@ -176,7 +176,11 @@ Dinner: \
 Menus are edited in Obsidian's native editor with Cooklang highlighting. Typing
 `@` in a menu (or `@./` in a recipe) suggests recipes from the vault (`@gno` finds
 *Krämig gnocchi*); choosing one inserts `@./Recept/Krämig gnocchi med salsiccia{}`
-with the cursor inside the braces, ready for an amount such as `2%servings`. The
+with the cursor inside the braces, ready for an amount such as `2%servings`.
+In the editor, references are underlined: Cmd/Ctrl+click one, use **Open recipe
+reference under cursor** (or the editor's context menu), or press `gf` in Vim
+mode to open the recipe at the reference's scale. Elsewhere `gf` follows the link
+under the cursor. The
 preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
 step as a meal, with links that open the referenced recipe already scaled. The
 plan comes first, beside the ingredients on wide panes and above them on phones.
