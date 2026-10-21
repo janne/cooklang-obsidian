@@ -31,6 +31,8 @@ Opening a recipe in Preview shows a single rich recipe page:
 - **Per-step images** following the [Cooklang convention](https://cooklang.org/docs/spec/#adding-pictures)
   (`Recipe.1.jpg` for the first step, `Recipe.2.jpg` for the second, …).
 - **Step tracking** — tap a step to mark it current and dim completed steps.
+- **Screen stays awake** while a recipe preview is on screen, on platforms that support the
+  Screen Wake Lock API (including Obsidian on iOS). It is released when you switch away.
 
 Each of these can be toggled in the plugin settings (Servings scaler, Two-column layout,
 Step tracking), falling back to a simple stacked list.
