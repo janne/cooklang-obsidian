@@ -43,6 +43,12 @@ import type { RecipeReferenceScaleRequest } from './utils/scaling';
 import { createUiInstanceId } from './ui/instanceIds';
 import type { RecipeRefTarget } from './utils/ingredientAggregator';
 import { referenceAt, type SourceReference } from './utils/sourceReferences';
+import { vaultPathsFromObsidianUrls } from './utils/referenceDrops';
+
+/** Obsidian's drag state for files dragged within the app; not public API. */
+interface DragManager {
+  draggable?: { type?: string; file?: TAbstractFile; files?: TAbstractFile[] } | null;
+}
 
 /** The parts of Obsidian's bundled CodeMirror Vim API used for `gf`. */
 interface VimApi {
@@ -116,7 +122,11 @@ export default class CookPlugin extends Plugin {
     this.registerView("cook", this.cookViewCreator);
     this.registerExtensions(["cook", "menu"], "markdown");
     this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
-    this.registerEditorExtension(sourceReferenceEvents({ open: this.openSourceReference, hover: this.hoverSourceReference }));
+    this.registerEditorExtension(sourceReferenceEvents({
+      open: this.openSourceReference,
+      hover: this.hoverSourceReference,
+      droppedRecipes: this.droppedRecipes,
+    }));
     this.registerEditorSuggest(new RecipeReferenceSuggest(this.app));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
@@ -426,6 +436,29 @@ export default class CookPlugin extends Plugin {
     this.renderChildren.add(child);
     popover.addChild(child);
     void child.refresh();
+  };
+
+  /**
+   * Paths of recipes dragged from the file explorer, search, or a tab, or null
+   * when anything else is dropped so Obsidian handles it as usual. The dragged
+   * files come from Obsidian's drag manager, falling back to the
+   * `obsidian://open` links a file drag carries.
+   */
+  private droppedRecipes = (event: DragEvent): string[] | null => {
+    const draggable = (this.app as unknown as { dragManager?: DragManager }).dragManager?.draggable;
+    let files: TAbstractFile[] = draggable?.type === 'file' && draggable.file ? [draggable.file]
+      : draggable?.type === 'files' && draggable.files ? draggable.files : [];
+    if (!files.length) {
+      const links = `${event.dataTransfer?.getData('text/uri-list') ?? ''}\n${event.dataTransfer?.getData('text/plain') ?? ''}`;
+      files = [...new Set(vaultPathsFromObsidianUrls(links))].flatMap(path => {
+        const file = this.app.vault.getAbstractFileByPath(path) ?? this.app.vault.getAbstractFileByPath(`${path}.md`);
+        return file ? [file] : [];
+      });
+    }
+    const recipes = files.filter((file): file is TFile => file instanceof TFile && !isMenuFile(file.path)
+      && isRecipeFile(file.path, this.app.metadataCache.getFileCache(file)?.frontmatter));
+    // Mixed drops keep Obsidian's behavior for all files rather than splitting them.
+    return recipes.length && recipes.length === files.length ? recipes.map(file => file.path) : null;
   };
 
   private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {

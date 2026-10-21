@@ -176,7 +176,9 @@ Dinner: \
 Menus are edited in Obsidian's native editor with Cooklang highlighting. Typing
 `@` in a menu (or `@./` in a recipe) suggests recipes from the vault (`@gno` finds
 *Krämig gnocchi*); choosing one inserts `@./Recept/Krämig gnocchi med salsiccia{}`
-with the cursor inside the braces, ready for an amount such as `2%servings`.
+with the cursor inside the braces, ready for an amount such as `2%servings`. On
+desktop you can also drag recipes from the file explorer into a menu to insert
+references where they land.
 In the editor, references look like `[[links]]`: hover with Cmd/Ctrl for a page
 preview, Cmd/Ctrl+click one, use **Open recipe
 reference under cursor** (or the editor's context menu), or press `gf` in Vim

@@ -63,7 +63,7 @@ describe('native editor decorations', () => {
     });
 
     it('marks references like links and follows one on Mod+click', () => {
-        const handlers = { open: vi.fn(), hover: vi.fn() };
+        const handlers = { open: vi.fn(), hover: vi.fn(), droppedRecipes: vi.fn(() => null) };
         const source = 'Dinner: @./Recept/Pizzasallad{2} and @salt';
         const { view, decorations, info } = setup('Week.menu', source, handlers);
         const marks: string[] = [];
@@ -88,5 +88,29 @@ describe('native editor decorations', () => {
         const link = view.contentDOM.querySelector('.cook-source-reference')!;
         link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
         expect(handlers.hover).toHaveBeenCalledWith('Week.menu', target, expect.any(MouseEvent), link, info);
+    });
+
+    it('inserts dropped recipes as references in menus only', () => {
+        const dropped = vi.fn<(event: DragEvent) => string[] | null>(() => ['Recept/Pizzasallad.cook']);
+        const handlers = { open: vi.fn(), hover: vi.fn(), droppedRecipes: dropped };
+        const drop = (view: EditorView, position: number) => {
+            view.posAtCoords = () => position;
+            const event = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+            view.contentDOM.dispatchEvent(event);
+            return event;
+        };
+
+        const menu = setup('Week.menu', 'Dinner: and more', handlers);
+        expect(drop(menu.view, 7).defaultPrevented).toBe(true);
+        expect(menu.view.state.doc.toString()).toBe('Dinner: @./Recept/Pizzasallad{} and more');
+        expect(menu.view.state.selection.main.head).toBe(31);
+
+        dropped.mockReturnValue(null);
+        expect(drop(menu.view, 0).defaultPrevented).toBe(false);
+
+        dropped.mockReturnValue(['Recept/Pizzasallad.cook']);
+        const recipe = setup('Dinner.cook', 'Mix @rice.', handlers);
+        expect(drop(recipe.view, 0).defaultPrevented).toBe(false);
+        expect(recipe.view.state.doc.toString()).toBe('Mix @rice.');
     });
 });
