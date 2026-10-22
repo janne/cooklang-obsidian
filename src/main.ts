@@ -11,6 +11,7 @@ import {
   Notice,
   TextFileView,
   type Editor,
+  getLinkpath,
   HoverPopover,
   Keymap,
   type HoverParent,
@@ -35,6 +36,8 @@ import { RecipeEmbedChild } from './ui/RecipeEmbedChild';
 import { RecipeReferenceSuggest } from './ui/RecipeReferenceSuggest';
 import { wholeRecipeEmbedRoot, WholeRecipeEmbedRegistry } from './utils/wholeRecipeEmbeds';
 import { nativeCookEditor, sourceReferenceEvents } from './mode/cook/nativeEditor';
+import { menuLinkNames } from './mode/cook/menuLinkNames';
+import { menuLinkText, menuSuffixStart } from './utils/menuLinks';
 import { isRecipeSource } from './utils/recipeSource';
 import { RecipeSessions, type RecipeSession } from './services/RecipeSessions';
 import { TimerService } from './services/TimerService';
@@ -151,6 +154,17 @@ export default class CookPlugin extends Plugin {
     };
     this.registerMarkdownCodeBlockProcessor('cook', renderRecipeBlock);
     this.registerMarkdownCodeBlockProcessor('cooklang', renderRecipeBlock);
+
+    // Links to menus read without `.menu`, as links to notes read without `.md`.
+    this.registerEditorExtension(menuLinkNames(this.isMenuLink));
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      for (const link of Array.from(el.querySelectorAll<HTMLAnchorElement>('a.internal-link'))) {
+        const href = link.getAttribute('data-href');
+        // Aliased and heading links show other text and keep it.
+        if (!href || link.textContent !== href || menuSuffixStart(href) === null) continue;
+        if (this.isMenuLink(href, ctx.sourcePath)) link.setText(menuLinkText(href));
+      }
+    });
 
     const embeds = new WholeRecipeEmbedRegistry();
     this.registerMarkdownPostProcessor(async (el, ctx) => {
@@ -460,6 +474,11 @@ export default class CookPlugin extends Plugin {
       && isRecipeFile(file.path, this.app.metadataCache.getFileCache(file)?.frontmatter));
     // Mixed drops keep Obsidian's behavior for all files rather than splitting them.
     return recipes.length && recipes.length === files.length ? recipes.map(file => file.path) : null;
+  };
+
+  private isMenuLink = (linktext: string, sourcePath: string): boolean => {
+    const file = this.app.metadataCache.getFirstLinkpathDest(getLinkpath(linktext), sourcePath);
+    return !!file && isMenuFile(file.path);
   };
 
   private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {

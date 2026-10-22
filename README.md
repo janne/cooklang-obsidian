@@ -157,7 +157,8 @@ A [Cooklang menu](https://cooklang.org/docs/conventions/#menu-files) is a Cookla
 file that composes a meal plan from recipe references. Store it as `Week 1.menu`
 or, to keep it a Markdown note, `Week 1.menu.md`; both are recognized by their
 filename. Use the **Create new menu** command or **New menu** in a folder's context
-menu to start one.
+menu to start one. Links to a menu, such as `[[Week 1.menu]]`, read as
+`Week 1` in Reading view and Live Preview, as links to notes hide `.md`.
 
 ```cooklang
 ---
