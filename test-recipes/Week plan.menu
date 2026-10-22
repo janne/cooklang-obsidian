@@ -1,0 +1,25 @@
+---
+servings: 2
+---
+
+-- References resolve from the vault root; open test-recipes as the vault.
+
+== Monday (2026-10-19) ==
+
+Lunch: \
+- @./markdown-rice{2%servings} with @lemon{1}(wedges)
+
+Dinner: \
+- @./curry{2%servings}
+
+== Tuesday (2026-10-20) ==
+
+> The curry leftovers are lunch.
+
+Dinner: \
+- @./filename-rice{2} \
+- @?chilli flakes{1%tsp}
+
+== Snacks ==
+- @apples{4} \
+- @./missing-recipe{}

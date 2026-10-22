@@ -20,3 +20,12 @@ export function embedSettings(base: CooklangSettings): CooklangSettings {
         showImages: false,
     };
 }
+
+/**
+ * A hover preview is an embed with the recipe header: it keeps the embed's
+ * compact, read-only flags but follows the user's image setting, so the header
+ * can show the main image as the full preview does. Step images stay off.
+ */
+export function hoverPreviewSettings(base: CooklangSettings): CooklangSettings {
+    return { ...embedSettings(base), showImages: base.showImages };
+}

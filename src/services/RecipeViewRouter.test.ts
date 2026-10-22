@@ -14,7 +14,7 @@ function setup(defaultView: 'source' | 'preview' = 'preview') {
 }
 
 describe('Markdown recipe routing', () => {
-    it.each(['Dinner.cook', 'Dinner.cook.md', 'Dinner.md'])('uses native Source mode for %s with the source default', async path => {
+    it.each(['Dinner.cook', 'Dinner.cook.md', 'Dinner.md', 'Week.menu', 'Week.menu.md'])('uses native Source mode for %s with the source default', async path => {
         const { leaf, router, switchView } = setup('source');
         leaf.state.state = { file: path, mode: 'source', source: false };
         await router.route(leaf);

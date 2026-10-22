@@ -5,6 +5,7 @@ import type { CooklangSettings } from '../settings';
 import type { RecipeRefTarget } from '../utils/ingredientAggregator';
 import type { TimerSnapshot } from '../services/TimerService';
 import type { RecipeReferenceScaleRequest } from '../utils/scaling';
+import type { CombinedIngredients } from '../utils/combinedIngredients';
 
 export interface PreviewState {
     scale: number;
@@ -49,6 +50,21 @@ export interface RecipeRenderModel {
     callbacks: PreviewCallbacks;
     host: RecipeHostAdapter;
     timers: TimerController | null;
+    /** Present only for meal-plan (`.menu`) previews. */
+    menu?: MenuRenderState;
+}
+
+export type CombinedIngredientsState =
+    | { status: 'loading' }
+    | { status: 'error'; message: string }
+    | { status: 'ready'; list: CombinedIngredients };
+
+export interface MenuRenderState {
+    /** Local `YYYY-MM-DD`, so a dated day can be marked as today. */
+    today: string;
+    combined: CombinedIngredientsState;
+    /** Main image URL per referenced recipe path (sibling image file or `image` metadata). */
+    images: Record<string, string>;
 }
 
 export type EmbedRenderState =

@@ -1,4 +1,4 @@
-import { TextFileView, WorkspaceLeaf, type ViewStateResult, type Menu, Scope } from 'obsidian';
+import { TFile, TextFileView, WorkspaceLeaf, type ViewStateResult, type Menu, Scope } from 'obsidian';
 import type { CooklangSettings } from './settings';
 import { parserService } from './services/ParserService';
 import type { RecipeSession } from './services/RecipeSessions';
@@ -7,8 +7,14 @@ import { parseServingsValue, computeScale, computeReferenceScale, deriveServings
 import { mount, unmount } from 'svelte';
 import { writable } from 'svelte/store';
 import CookViewRoot from './ui/CookViewRoot.svelte';
-import type { RecipeHostAdapter, RecipeRenderModel } from './ui/types';
-import { recipeName } from './utils/recipeFiles';
+import type { CombinedIngredientsState, MenuRenderState, RecipeHostAdapter, RecipeRenderModel } from './ui/types';
+import { isMenuFile, recipeName } from './utils/recipeFiles';
+import { buildCombinedIngredients, type CombinedRecipe } from './utils/combinedIngredients';
+import { findRecipeImages } from './utils/imageHelpers';
+import { getRecipeImageUrls } from './utils/recipeImages';
+import { localDateKey } from './utils/menuModel';
+
+const COMBINED_REFRESH_DELAY = 250;
 
 /** Interactive preview only. Obsidian owns every source editor. */
 export class CookView extends TextFileView {
@@ -16,6 +22,15 @@ export class CookView extends TextFileView {
     private component: ReturnType<typeof mount>;
     private disposed = false;
     private currentSession: RecipeSession | null = null;
+    /** A menu's combined ingredients, keyed by path, scale and source. */
+    private combined: {
+        key: string;
+        state: CombinedIngredientsState;
+        dependencies: Set<string>;
+        images: Record<string, string>;
+    } | null = null;
+    private combinedGeneration = 0;
+    private combinedRefresh: number | null = null;
 
     constructor(leaf: WorkspaceLeaf, private settings: CooklangSettings,
         private acquireSession: (path: string) => RecipeSession,
@@ -35,6 +50,16 @@ export class CookView extends TextFileView {
     async onload(): Promise<void> {
         super.onload();
         this.addAction('edit-3', 'Edit recipe source', () => { void this.editSource(this.leaf); });
+        // Referenced recipes can change, appear, or move while a menu is open.
+        this.registerEvent(this.app.vault.on('modify', file => {
+            if (this.combined?.dependencies.has(file.path)) this.refreshCombined();
+        }));
+        this.registerEvent(this.app.vault.on('create', () => this.refreshCombined()));
+        this.registerEvent(this.app.vault.on('delete', () => this.refreshCombined()));
+        this.registerEvent(this.app.vault.on('rename', () => this.refreshCombined()));
+        this.register(() => {
+            if (this.combinedRefresh !== null) window.clearTimeout(this.combinedRefresh);
+        });
         await parserService.initialize();
         if (!this.disposed) this.renderPreview();
     }
@@ -63,6 +88,8 @@ export class CookView extends TextFileView {
         this.previewStore.set(null);
         this.data = '';
         this.currentSession = null;
+        this.combined = null;
+        this.combinedGeneration++;
     }
 
     getDisplayText(): string { return this.file ? recipeName(this.file.path) : 'Cooklang (no file)'; }
@@ -70,7 +97,7 @@ export class CookView extends TextFileView {
     // Otherwise Obsidian reuses this preview for unrelated Markdown notes.
     canAcceptExtension(_extension: string): boolean { return false; }
     getViewType(): string { return 'cook'; }
-    getIcon(): string { return 'document-cook'; }
+    getIcon(): string { return this.file && isMenuFile(this.file.path) ? 'document-menu' : 'document-cook'; }
 
     getState(): Record<string, unknown> {
         const session = this.currentSession;
@@ -110,10 +137,17 @@ export class CookView extends TextFileView {
             session.pendingReferenceScale = null;
             [recipe] = parserService.parse(this.data, session.scale);
         }
+        const isMenu = !!this.file && isMenuFile(this.file.path);
+        // The parser reports absent servings as null. A menu then counts as one serving,
+        // so its scale always has a visible control acting as the plan multiplier.
         const { baseServings, displayServings } = deriveServingsState(
-            parseServingsValue(baseRecipe.servings), session.scale);
+            parseServingsValue(isMenu ? baseRecipe.servings ?? undefined : baseRecipe.servings), session.scale);
+        const menu: MenuRenderState | undefined = isMenu && this.file
+            ? { today: localDateKey(new Date()), combined: this.combinedState(this.file, this.data, session.scale),
+                images: this.combined?.images ?? {} }
+            : undefined;
         this.previewStore.set({
-            instanceId: session.instanceId, interactive: true, recipe, file: this.file,
+            instanceId: session.instanceId, interactive: true, recipe, file: this.file, menu,
             settings: this.settings, host: this.host, timers: session.timers,
             state: { scale: session.scale, baseServings, displayServings,
                 checkedIngredients: session.checkedIngredients, currentStep: session.currentStep },
@@ -134,6 +168,55 @@ export class CookView extends TextFileView {
                 },
             },
         });
+    }
+
+    /** Starts a rebuild when the inputs changed, keeping the previous list visible meanwhile. */
+    private combinedState(file: TFile, source: string, scale: number): CombinedIngredientsState {
+        const key = `${file.path}\u0000${scale}\u0000${source}`;
+        if (this.combined?.key === key) return this.combined.state;
+        const generation = ++this.combinedGeneration;
+        const state: CombinedIngredientsState = this.combined?.state.status === 'ready'
+            ? this.combined.state : { status: 'loading' };
+        this.combined = { key, state, dependencies: this.combined?.dependencies ?? new Set(), images: this.combined?.images ?? {} };
+        const images: Record<string, string> = {};
+        const finish = (next: CombinedIngredientsState, dependencies: string[]): void => {
+            if (this.disposed || generation !== this.combinedGeneration) return;
+            this.combined = { key, state: next, dependencies: new Set(dependencies), images };
+            this.renderPreview();
+        };
+        buildCombinedIngredients(file.path, source, scale, {
+            parse: (text, factor) => parserService.parse(text, factor)[0],
+            read: async path => {
+                const target = this.app.vault.getAbstractFileByPath(path);
+                if (!(target instanceof TFile)) throw new Error(`${path} does not exist.`);
+                return this.app.vault.cachedRead(target);
+            },
+            resolve: reference => this.host.resolveReference(file, reference)?.targetPath ?? null,
+            visit: (path, recipe) => {
+                const image = this.recipeImageUrl(path, recipe);
+                if (image) images[path] = image;
+            },
+        }).then(
+            list => finish({ status: 'ready', list }, list.dependencies),
+            error => finish({ status: 'error', message: error instanceof Error ? error.message : String(error) }, []),
+        );
+        return state;
+    }
+
+    /** As in the recipe's own header: a sibling image file first, then `image` metadata. */
+    private recipeImageUrl(path: string, recipe: CombinedRecipe): string | null {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        const sibling = file instanceof TFile ? findRecipeImages(file).mainImage : null;
+        return sibling ? this.app.vault.getResourcePath(sibling) : getRecipeImageUrls(recipe.images)[0] ?? null;
+    }
+
+    private refreshCombined(): void {
+        if (this.disposed || !this.file || !isMenuFile(this.file.path) || this.combinedRefresh !== null) return;
+        this.combinedRefresh = window.setTimeout(() => {
+            this.combinedRefresh = null;
+            if (this.combined) this.combined.key = '';
+            this.renderPreview();
+        }, COMBINED_REFRESH_DELAY);
     }
 
     updateSettings(settings: CooklangSettings): void {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     parseServingsValue,
     computeReferenceScale,
+    resolveReferenceScale,
     computeScale,
     clampServings,
     deriveServingsState,
@@ -52,6 +53,31 @@ describe('computeReferenceScale', () => {
 
     it('does not apply yield scaling when units differ', () => {
         expect(computeReferenceScale({ quantity: 150, unit: 'g' }, 2, '500%ml')).toBe(1);
+    });
+});
+
+describe('resolveReferenceScale', () => {
+    it('follows the Cooklang conventions for each reference form', () => {
+        expect(resolveReferenceScale(null, 4, undefined)).toEqual({ ok: true, factor: 1 });
+        expect(resolveReferenceScale({ quantity: 2, unit: null }, 4, undefined)).toEqual({ ok: true, factor: 2 });
+        expect(resolveReferenceScale({ quantity: 6, unit: 'servings' }, 3, undefined)).toEqual({ ok: true, factor: 2 });
+        expect(resolveReferenceScale({ quantity: 6, unit: 'servings' }, '4 portions', undefined)).toEqual({ ok: true, factor: 1.5 });
+    });
+
+    it('treats missing servings as one serving', () => {
+        expect(resolveReferenceScale({ quantity: 4, unit: 'servings' }, undefined, undefined)).toEqual({ ok: true, factor: 4 });
+        expect(resolveReferenceScale({ quantity: 4, unit: 'servings' }, null, undefined)).toEqual({ ok: true, factor: 4 });
+    });
+
+    it('matches one entry of a yield list', () => {
+        expect(resolveReferenceScale({ quantity: 175, unit: 'g' }, 2, ['500%ml', '350%g'])).toEqual({ ok: true, factor: 0.5 });
+        expect(resolveReferenceScale({ quantity: 250, unit: 'ml' }, 2, '[500%ml, 350%g]')).toEqual({ ok: true, factor: 0.5 });
+    });
+
+    it('reports an unmatched or missing yield and non-numeric servings as errors', () => {
+        expect(resolveReferenceScale({ quantity: 1, unit: 'cups' }, 2, '500%ml').ok).toBe(false);
+        expect(resolveReferenceScale({ quantity: 150, unit: 'ml' }, 2, undefined).ok).toBe(false);
+        expect(resolveReferenceScale({ quantity: 2, unit: 'servings' }, 'a few', undefined).ok).toBe(false);
     });
 });
 

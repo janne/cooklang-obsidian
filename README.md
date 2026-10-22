@@ -151,6 +151,62 @@ recipe: true
 This works in full recipe views, whole-note recipe embeds, and embedded
 `cook`/`cooklang` blocks. Reference paths remain relative to the vault root.
 
+## Meal plans (`.menu`)
+
+A [Cooklang menu](https://cooklang.org/docs/conventions/#menu-files) is a Cooklang
+file that composes a meal plan from recipe references. Store it as `Week 1.menu`
+or, to keep it a Markdown note, `Week 1.menu.md`; both are recognized by their
+filename. Use the **Create new menu** command or **New menu** in a folder's context
+menu to start one. Links to a menu, such as `[[Week 1.menu]]`, read as
+`Week 1` in Reading view and Live Preview, as links to notes hide `.md`.
+
+```cooklang
+---
+servings: 2
+---
+
+== Monday (2026-03-07) ==
+
+Breakfast: \
+- @./Breakfast/Granola{2%servings} with @yogurt{200%g}
+
+Dinner: \
+- @./Risotto{2}
+```
+
+Menus are edited in Obsidian's native editor with Cooklang highlighting. Typing
+`@` in a menu (or `@./` in a recipe) suggests recipes from the vault (`@gno` finds
+*Krämig gnocchi*); choosing one inserts `@./Recept/Krämig gnocchi med salsiccia{}`
+with the cursor inside the braces, ready for an amount such as `2%servings`. On
+desktop you can also drag recipes from the file explorer into a menu to insert
+references where they land.
+In the editor, references look like `[[links]]`: hover with Cmd/Ctrl for a page
+preview, Cmd/Ctrl+click one, use **Open recipe
+reference under cursor** (or the editor's context menu), use Obsidian's **Follow
+link under cursor**, or press `gf` in Vim mode (including a `gf` mapped by Vimrc
+Support) to open the recipe at the reference's scale. The
+preview shows each section as a day (a `(YYYY-MM-DD)` date marks today) and each
+step as a meal, with links that open the referenced recipe already scaled and,
+when images are enabled, each recipe's main image above its name. A
+meal written as a `- ` list shows one item per line, even without the trailing
+`\` Cooklang otherwise needs to keep lines apart. The
+plan comes first, beside the ingredients on wide panes and above them on phones.
+The
+**Combined ingredients** list expands every referenced recipe, including the
+recipes they reference, merges quantities, and lists them alphabetically:
+
+- `@./Risotto{2}` makes twice the recipe; `@./Risotto{}` makes it as written.
+- `@./Risotto{6%servings}` scales by six divided by the recipe's `servings`
+  (one when it has none).
+- `@./Sauce{150%ml}` scales to a matching `yield` entry; a unit without a
+  matching yield is listed under **Not included** rather than guessed.
+- The servings scaler multiplies every reference and loose ingredient in the plan;
+  a menu without `servings` counts as one serving.
+- Optional items (`@?`) are listed separately and are not expanded.
+
+The combined list is read-only and is not saved; CookCLI's `.shopping-list`
+files are not read or written.
+
 ## Security
 > Third-party plugins can access files on your computer, connect to the internet, and even install additional programs.
 

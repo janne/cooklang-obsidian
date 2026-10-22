@@ -10,6 +10,12 @@ import {
   MarkdownPostProcessorContext,
   Notice,
   TextFileView,
+  type Editor,
+  getLinkpath,
+  HoverPopover,
+  Keymap,
+  type HoverParent,
+  type MarkdownFileInfo,
   parseYaml,
   stringifyYaml,
 } from 'obsidian';
@@ -21,19 +27,38 @@ import { ObsidianRecipeHost } from './ui/ObsidianRecipeHost';
 import changelog from '../CHANGELOG.md';
 import { ChangelogModal } from './ui/ChangelogModal';
 import { releaseNotesForUpdate } from './utils/releaseNotes';
-import { isRecipeFile, newRecipeContent, recipeFormat, recipeConversionPath, RECIPE_FORMATS, type RecipeFormat } from './utils/recipeFiles';
+import { cooklangFormat, isMenuFile, isRecipeFile, menuFormatFor, newMenuContent, newRecipeContent, recipeFormat, recipeConversionPath,
+  RECIPE_FORMATS, type RecipeFormat } from './utils/recipeFiles';
 import { RecipeViewRouter } from './services/RecipeViewRouter';
 import { convertRecipe, synchronizeRecipeBuffers } from './services/RecipeConversion';
 import { RecipeFormatModal } from './ui/RecipeFormatModal';
 import { RecipeEmbedChild } from './ui/RecipeEmbedChild';
+import { RecipeReferenceSuggest } from './ui/RecipeReferenceSuggest';
 import { wholeRecipeEmbedRoot, WholeRecipeEmbedRegistry } from './utils/wholeRecipeEmbeds';
-import { nativeCookEditor } from './mode/cook/nativeEditor';
+import { nativeCookEditor, sourceReferenceEvents } from './mode/cook/nativeEditor';
+import { menuLinkNames } from './mode/cook/menuLinkNames';
+import { menuLinkText, menuSuffixStart } from './utils/menuLinks';
 import { isRecipeSource } from './utils/recipeSource';
 import { RecipeSessions, type RecipeSession } from './services/RecipeSessions';
 import { TimerService } from './services/TimerService';
 import timerMp3 from './timer.mp3';
 import type { RecipeReferenceScaleRequest } from './utils/scaling';
 import { createUiInstanceId } from './ui/instanceIds';
+import type { RecipeRefTarget } from './utils/ingredientAggregator';
+import { referenceAt, type SourceReference } from './utils/sourceReferences';
+import { vaultPathsFromObsidianUrls } from './utils/referenceDrops';
+
+/** Obsidian's drag state for files dragged within the app; not public API. */
+interface DragManager {
+  draggable?: { type?: string; file?: TAbstractFile; files?: TAbstractFile[] } | null;
+}
+
+/** The parts of Obsidian's bundled CodeMirror Vim API used for `gf`. */
+interface VimApi {
+  defineAction(name: string, action: () => void): void;
+  mapCommand(keys: string, type: 'action', name: string, args: object, extra: { context: 'normal' }): void;
+  unmap(keys: string, context: 'normal'): void;
+}
 
 export default class CookPlugin extends Plugin {
 
@@ -47,6 +72,7 @@ export default class CookPlugin extends Plugin {
   private sessions!: RecipeSessions<WorkspaceLeaf, RecipeSession>;
   private routeTimeout: number | null = null;
   private routingReady = false;
+  private referenceHover: { parent: HoverParent; path: string; popover: HoverPopover } | null = null;
 
   saveData(data: CooklangSettings): Promise<void> {
     const settings = { ...data } as CooklangSettings & { lineWrap?: unknown };
@@ -93,11 +119,18 @@ export default class CookPlugin extends Plugin {
 
     // register a custom icon
     this.addDocumentIcon("cook");
+    this.addMenuIcon();
 
     // register the view and extensions
     this.registerView("cook", this.cookViewCreator);
-    this.registerExtensions(["cook"], "markdown");
+    this.registerExtensions(["cook", "menu"], "markdown");
     this.registerEditorExtension(nativeCookEditor(this.routeLeaves));
+    this.registerEditorExtension(sourceReferenceEvents({
+      open: this.openSourceReference,
+      hover: this.hoverSourceReference,
+      droppedRecipes: this.droppedRecipes,
+    }));
+    this.registerEditorSuggest(new RecipeReferenceSuggest(this.app));
 
     // Render ```cook / ```cooklang fenced blocks inside markdown notes as a
     // compact, read-only recipe (#73).
@@ -122,10 +155,22 @@ export default class CookPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor('cook', renderRecipeBlock);
     this.registerMarkdownCodeBlockProcessor('cooklang', renderRecipeBlock);
 
+    // Links to menus read without `.menu`, as links to notes read without `.md`.
+    this.registerEditorExtension(menuLinkNames(this.isMenuLink));
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      for (const link of Array.from(el.querySelectorAll<HTMLAnchorElement>('a.internal-link'))) {
+        const href = link.getAttribute('data-href');
+        // Aliased and heading links show other text and keep it.
+        if (!href || link.textContent !== href || menuSuffixStart(href) === null) continue;
+        if (this.isMenuLink(href, ctx.sourcePath)) link.setText(menuLinkText(href));
+      }
+    });
+
     const embeds = new WholeRecipeEmbedRegistry();
     this.registerMarkdownPostProcessor(async (el, ctx) => {
       const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
-      if (!(file instanceof TFile) || file.extension !== 'md'
+      // Menus are left as Markdown in transclusions; only recipes get the compact embed.
+      if (!(file instanceof TFile) || file.extension !== 'md' || isMenuFile(file.path)
           || !isRecipeFile(file.path, ctx.frontmatter ?? this.app.metadataCache.getFileCache(file)?.frontmatter)) return;
       const root = await wholeRecipeEmbedRoot(el);
       if (!root || this.disposed) return;
@@ -194,6 +239,8 @@ export default class CookPlugin extends Plugin {
       });
       this.routingReady = true;
       routeLeaves();
+      this.extendFollowLinkCommand();
+      this.registerVimFollow();
     });
 
     this.addSettingTab(new CookSettingsTab(this.app, this));
@@ -214,9 +261,17 @@ export default class CookPlugin extends Plugin {
                 this.app.workspace.getLeaf().openFile(newFile);
               });
           });
+          menu.addItem(item => item
+            .setTitle('New menu')
+            .setIcon('document-menu')
+            .setSection('action-primary')
+            .onClick(async () => {
+              const newFile = await this.menuFileCreator(file.path);
+              await this.app.workspace.getLeaf().openFile(newFile);
+            }));
         }
 
-        if (file instanceof TFile && (file.extension === 'md' || file.extension === 'cook')) {
+        if (file instanceof TFile && cooklangFormat(file.path)) {
           menu.addItem(item => item
             .setTitle('Open as Recipe')
             .setIcon('document-cook')
@@ -225,9 +280,16 @@ export default class CookPlugin extends Plugin {
       })
     );
 
-    this.registerEvent(this.app.workspace.on('editor-menu', (menu, _editor, view) => {
+    this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, view) => {
       const file = view.file;
-      if (file && (file.extension === 'md' || file.extension === 'cook')) {
+      const reference = this.referenceUnderCursor(editor, file);
+      if (file && reference) {
+        menu.addItem(item => item
+          .setTitle('Open recipe reference')
+          .setIcon('document-cook')
+          .onClick(() => this.openSourceReference(file.path, reference.target)));
+      }
+      if (file && cooklangFormat(file.path)) {
         menu.addItem(item => item
           .setTitle('Open as Recipe')
           .setIcon('document-cook')
@@ -259,6 +321,27 @@ export default class CookPlugin extends Plugin {
       callback: async () => {
         const newFile = await this.cookFileCreator();
         await this.app.workspace.getLeaf(true).openFile(newFile);
+      }
+    })
+
+    this.addCommand({
+      id: 'open-recipe-reference',
+      name: 'Open recipe reference under cursor',
+      editorCheckCallback: (checking, editor, ctx) => {
+        const file = ctx.file;
+        const reference = this.referenceUnderCursor(editor, file);
+        if (!file || !reference) return false;
+        if (!checking) this.openSourceReference(file.path, reference.target);
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: "create-menu",
+      name: "Create new menu",
+      callback: async () => {
+        const newFile = await this.menuFileCreator();
+        await this.app.workspace.getLeaf().openFile(newFile);
       }
     })
 
@@ -317,7 +400,7 @@ export default class CookPlugin extends Plugin {
         const file = this.app.workspace.getActiveFile();
         const leaf = this.app.workspace.activeLeaf;
         
-        if (!file || !leaf || (file.extension !== 'md' && file.extension !== 'cook')) return false;
+        if (!file || !leaf || !cooklangFormat(file.path)) return false;
         
         // Only show if currently in markdown view
         if (checking) return leaf.view.getViewType() === 'markdown';
@@ -328,6 +411,130 @@ export default class CookPlugin extends Plugin {
     });
 
     await this.showReleaseNotesAfterUpdate(isFirstInstall);
+  }
+
+  /** Follows a `@./…{…}` reference like a preview link, including its scale. */
+  private openSourceReference = (sourcePath: string, target: RecipeRefTarget): void => {
+    const source = this.app.vault.getAbstractFileByPath(sourcePath);
+    const resolved = this.recipeHost.resolveReference(source instanceof TFile ? source : null, target);
+    if (!resolved) {
+      const path = [...target.components.filter(part => part && part !== '.'), target.name].join('/');
+      new Notice(`Recipe not found: ${path}`);
+      return;
+    }
+    this.recipeHost.openReference(resolved);
+  };
+
+  /**
+   * Mod+hover shows the recipe in a popover, like an editor `[[link]]` preview.
+   * Obsidian's page preview cannot render `.cook` files, so the popover holds
+   * the plugin's compact, read-only recipe render instead.
+   */
+  private hoverSourceReference = (sourcePath: string, target: RecipeRefTarget, event: MouseEvent,
+      targetEl: HTMLElement, info: MarkdownFileInfo | null): void => {
+    if (!Keymap.isModEvent(event)) return;
+    const source = this.app.vault.getAbstractFileByPath(sourcePath);
+    const resolved = this.recipeHost.resolveReference(source instanceof TFile ? source : null, target);
+    const file = resolved && this.app.vault.getAbstractFileByPath(resolved.targetPath);
+    if (!(file instanceof TFile)) return;
+    const parent: HoverParent = info && 'hoverPopover' in info ? info as unknown as HoverParent : { hoverPopover: null };
+    // Moving between the spans of one reference fires mouseover repeatedly; keep its popover.
+    const current = this.referenceHover;
+    if (current?.parent === parent && current.path === file.path && current.popover.hoverEl.isConnected) return;
+
+    const popover = new HoverPopover(parent, targetEl);
+    this.referenceHover = { parent, path: file.path, popover };
+    popover.hoverEl.addClass('cook-hover-popover');
+    const content = popover.hoverEl.createDiv({ cls: 'cook-hover-content' });
+    const child = new RecipeEmbedChild(content, content, this.app, file, () => this.settings, this.recipeHost, undefined,
+      () => this.renderChildren.delete(child), 'hover');
+    this.renderChildren.add(child);
+    popover.addChild(child);
+    void child.refresh();
+  };
+
+  /**
+   * Paths of recipes dragged from the file explorer, search, or a tab, or null
+   * when anything else is dropped so Obsidian handles it as usual. The dragged
+   * files come from Obsidian's drag manager, falling back to the
+   * `obsidian://open` links a file drag carries.
+   */
+  private droppedRecipes = (event: DragEvent): string[] | null => {
+    const draggable = (this.app as unknown as { dragManager?: DragManager }).dragManager?.draggable;
+    let files: TAbstractFile[] = draggable?.type === 'file' && draggable.file ? [draggable.file]
+      : draggable?.type === 'files' && draggable.files ? draggable.files : [];
+    if (!files.length) {
+      const links = `${event.dataTransfer?.getData('text/uri-list') ?? ''}\n${event.dataTransfer?.getData('text/plain') ?? ''}`;
+      files = [...new Set(vaultPathsFromObsidianUrls(links))].flatMap(path => {
+        const file = this.app.vault.getAbstractFileByPath(path) ?? this.app.vault.getAbstractFileByPath(`${path}.md`);
+        return file ? [file] : [];
+      });
+    }
+    const recipes = files.filter((file): file is TFile => file instanceof TFile && !isMenuFile(file.path)
+      && isRecipeFile(file.path, this.app.metadataCache.getFileCache(file)?.frontmatter));
+    // Mixed drops keep Obsidian's behavior for all files rather than splitting them.
+    return recipes.length && recipes.length === files.length ? recipes.map(file => file.path) : null;
+  };
+
+  private isMenuLink = (linktext: string, sourcePath: string): boolean => {
+    const file = this.app.metadataCache.getFirstLinkpathDest(getLinkpath(linktext), sourcePath);
+    return !!file && isMenuFile(file.path);
+  };
+
+  private referenceUnderCursor(editor: Editor, file: TFile | null): SourceReference | null {
+    if (!file || !isRecipeSource(file.path, editor.getValue(), parseYaml)) return null;
+    const cursor = editor.getCursor();
+    return referenceAt(editor.getLine(cursor.line), cursor.ch);
+  }
+
+  /**
+   * Obsidian's "Follow link under cursor" also follows a recipe reference. Vim
+   * `gf` mappings (Vimrc Support's, or ours below) and the command's hotkey all
+   * run this command, so wrapping it works whichever mapping wins. The command
+   * registry is not public API; when its shape differs, it is left untouched.
+   */
+  private extendFollowLinkCommand(): void {
+    type CheckCallback = (checking: boolean) => boolean | void;
+    const registry = (this.app as unknown as { commands?: { commands?: Record<string, { checkCallback?: CheckCallback }> } })
+      .commands?.commands;
+    const command = registry?.['editor:follow-link'];
+    const original = command?.checkCallback;
+    if (this.disposed || !command || typeof original !== 'function') return;
+    const extended: CheckCallback = checking => {
+      const active = this.app.workspace.activeEditor;
+      const file = active?.file ?? null;
+      const reference = active?.editor ? this.referenceUnderCursor(active.editor, file) : null;
+      if (!file || !reference) return original.call(command, checking);
+      if (!checking) this.openSourceReference(file.path, reference.target);
+      return true;
+    };
+    command.checkCallback = extended;
+    this.register(() => {
+      if (command.checkCallback === extended) command.checkCallback = original;
+    });
+  }
+
+  /**
+   * Obsidian's Vim mode has no `gf`; map it to "Follow link under cursor". A
+   * vimrc plugin that maps `gf` later takes precedence, which is fine when it
+   * runs the same command. The Vim API is only reachable through Obsidian's
+   * global CodeMirror adapter.
+   */
+  private registerVimFollow(): void {
+    const vim = (window as unknown as { CodeMirrorAdapter?: { Vim?: VimApi } }).CodeMirrorAdapter?.Vim;
+    if (this.disposed || !vim) return;
+    vim.defineAction('cooklangFollowLink', () => {
+      const commands = (this.app as unknown as { commands?: { executeCommandById(id: string): boolean } }).commands;
+      commands?.executeCommandById('editor:follow-link');
+    });
+    vim.mapCommand('gf', 'action', 'cooklangFollowLink', {}, { context: 'normal' });
+    this.register(() => {
+      try {
+        vim.unmap('gf', 'normal');
+      } catch {
+        // Another plugin or a vimrc may already have replaced the mapping.
+      }
+    });
   }
 
   private reportError(message: string, error: unknown): void {
@@ -459,6 +666,15 @@ export default class CookPlugin extends Plugin {
   }
 
   cookFileCreator = async (folderPath?: string) => {
+    const format = this.settings.defaultRecipeFormat;
+    return this.createUntitledFile(format, newRecipeContent(format), folderPath);
+  }
+
+  menuFileCreator = async (folderPath?: string) => {
+    return this.createUntitledFile(menuFormatFor(this.settings.defaultRecipeFormat), newMenuContent(), folderPath);
+  }
+
+  private createUntitledFile = async (format: string, content: string, folderPath?: string) => {
     // Default to root folder
     let newFileFolderPath = '';
 
@@ -477,13 +693,12 @@ export default class CookPlugin extends Plugin {
     if (newFileFolderPath && !newFileFolderPath.endsWith('/')) newFileFolderPath += '/';
 
     const originalPath = newFileFolderPath;
-    const format = this.settings.defaultRecipeFormat;
     newFileFolderPath = `${newFileFolderPath}Untitled.${format}`;
     let i = 0;
     while(this.app.vault.getAbstractFileByPath(newFileFolderPath)) {
       newFileFolderPath = `${originalPath}Untitled ${++i}.${format}`;
     }
-    const newFile = await this.app.vault.create(newFileFolderPath, newRecipeContent(format));
+    const newFile = await this.app.vault.create(newFileFolderPath, content);
     return newFile;
   }
 
@@ -500,6 +715,18 @@ export default class CookPlugin extends Plugin {
         leaf.view.updateSettings(this.settings);
       }
     });
+  }
+
+  // A dish under a list of days, for meal plans.
+  addMenuIcon = () => {
+    addIcon('document-menu', `
+    <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30 52C38.8366 52 46 44.8366 46 36H14C14 44.8366 21.1634 52 30 52Z" fill="currentColor"/>
+    <rect x="12" y="8" width="36" height="5" rx="2.5" fill="currentColor"/>
+    <rect x="12" y="18" width="36" height="5" rx="2.5" fill="currentColor"/>
+    <rect x="12" y="28" width="24" height="5" rx="2.5" fill="currentColor"/>
+    </svg>
+    `);
   }
 
   // this function provides the icon for the document

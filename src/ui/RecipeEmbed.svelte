@@ -1,11 +1,28 @@
 <script lang="ts">
     import type { Readable } from 'svelte/store';
+    import Hero from './components/Hero.svelte';
     import IngredientList from './components/IngredientList.svelte';
+    import { findRecipeImages } from '../utils/imageHelpers';
+    import { getRecipeImageUrls } from '../utils/recipeImages';
     import MethodSteps from './components/MethodSteps.svelte';
     import type { EmbedRenderState } from './types';
     import { recipeName } from '../utils/recipeFiles';
 
-    let { renderState, wholeNote = false }: { renderState: Readable<EmbedRenderState>; wholeNote?: boolean } = $props();
+    let {
+        renderState,
+        wholeNote = false,
+        header = false,
+    }: {
+        renderState: Readable<EmbedRenderState>;
+        wholeNote?: boolean;
+        /** The full preview's header instead of a title link, for hover previews. */
+        header?: boolean;
+    } = $props();
+    let mainImage = $derived.by(() => {
+        if (!header || $renderState.status !== 'ready') return null;
+        const model = $renderState.model;
+        return findRecipeImages(model.file).mainImage ?? getRecipeImageUrls(model.recipe.images)[0] ?? null;
+    });
 </script>
 
 {#if $renderState.status === 'loading'}
@@ -19,7 +36,9 @@
     </div>
 {:else}
     <div class="cook-embed">
-        {#if wholeNote && $renderState.model.file}
+        {#if header}
+            <Hero model={$renderState.model} {mainImage} />
+        {:else if wholeNote && $renderState.model.file}
             {@const model = $renderState.model}
             {@const file = model.file!}
             <h2 class="cook-embed-title"><a href={file.path} onclick={event => {

@@ -1,7 +1,32 @@
-import { Decoration, ViewPlugin, type DecorationSet, type EditorView, type ViewUpdate } from '@codemirror/view';
-import { editorInfoField, parseYaml } from 'obsidian';
+import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { Prec, type Range } from '@codemirror/state';
+import { editorInfoField, Keymap, parseYaml, type MarkdownFileInfo } from 'obsidian';
+import type { RecipeRefTarget } from '../../utils/ingredientAggregator';
+import { isMenuFile } from '../../utils/recipeFiles';
 import { isRecipeSource } from '../../utils/recipeSource';
+import { referenceDropText } from '../../utils/referenceDrops';
+import { findSourceReferences, referenceAt } from '../../utils/sourceReferences';
 import { cookHighlightRanges } from './highlightRanges';
+
+const referencePathMark = Decoration.mark({ class: 'cook-source-reference' });
+const referenceSyntaxMark = Decoration.mark({ class: 'cook-source-reference-syntax' });
+
+/** Like `[[links]]`: the path reads as the link, `@` and `{…}` as dimmed syntax. */
+function referenceRanges(view: EditorView): Range<Decoration>[] {
+    const ranges: Range<Decoration>[] = [];
+    for (let number = 1; number <= view.state.doc.lines; number++) {
+        const line = view.state.doc.line(number);
+        if (!line.text.includes('@')) continue;
+        for (const reference of findSourceReferences(line.text)) {
+            ranges.push(
+                referenceSyntaxMark.range(line.from + reference.from, line.from + reference.pathFrom),
+                referencePathMark.range(line.from + reference.pathFrom, line.from + reference.pathTo),
+                referenceSyntaxMark.range(line.from + reference.pathTo, line.from + reference.to),
+            );
+        }
+    }
+    return ranges;
+}
 
 export function nativeCookEditor(onEligibilityChange: () => void) {
     return ViewPlugin.fromClass(class {
@@ -24,9 +49,75 @@ export function nativeCookEditor(onEligibilityChange: () => void) {
             this.path = path;
             this.eligible = eligible;
             this.decorations = eligible
-                ? Decoration.set(cookHighlightRanges(source).map(({ from, to, classes }) =>
-                    Decoration.mark({ class: classes }).range(from, to)))
+                ? Decoration.set([
+                    ...cookHighlightRanges(source).map(({ from, to, classes }) =>
+                        Decoration.mark({ class: classes }).range(from, to)),
+                    ...referenceRanges(view),
+                ], true)
                 : Decoration.none;
         }
     }, { decorations: plugin => plugin.decorations });
+}
+
+export interface SourceReferenceHandlers {
+    /** Follows a reference; `sourcePath` is the file being edited. */
+    open(sourcePath: string, target: RecipeRefTarget): void;
+    /** Offers Obsidian's page preview for a hovered reference. */
+    hover(sourcePath: string, target: RecipeRefTarget, event: MouseEvent, targetEl: HTMLElement, info: MarkdownFileInfo | null): void;
+    /** Vault paths of dragged recipes, or null when the drag is anything else. */
+    droppedRecipes(event: DragEvent): string[] | null;
+}
+
+function referenceAtEvent(view: EditorView, event: MouseEvent) {
+    const info = view.state.field(editorInfoField, false) ?? null;
+    const path = info?.file?.path ?? '';
+    if (!path || !isRecipeSource(path, view.state.doc.toString(), parseYaml)) return null;
+    const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (position === null) return null;
+    const line = view.state.doc.lineAt(position);
+    const reference = referenceAt(line.text, position - line.from);
+    return reference ? { info, path, reference } : null;
+}
+
+/**
+ * Like `[[links]]` in Source mode: Mod+click follows a reference and hovering
+ * offers a page preview. Dropping recipes into a menu inserts references where
+ * they land instead of `[[links]]`. Highest precedence lets these run before
+ * the host editor's own Mod+mousedown and drop handling.
+ */
+export function sourceReferenceEvents(handlers: SourceReferenceHandlers) {
+    return Prec.highest(EditorView.domEventHandlers({
+        mousedown(event, view) {
+            if (event.button !== 0 || !Keymap.isModifier(event, 'Mod')) return false;
+            const found = referenceAtEvent(view, event);
+            if (!found) return false;
+            event.preventDefault();
+            handlers.open(found.path, found.reference.target);
+            return true;
+        },
+        drop(event, view) {
+            const path = view.state.field(editorInfoField, false)?.file?.path ?? '';
+            if (!isMenuFile(path)) return false;
+            const files = handlers.droppedRecipes(event);
+            if (!files?.length) return false;
+            const position = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head;
+            const insertion = referenceDropText(files, view.state.sliceDoc(Math.max(0, position - 1), position),
+                view.state.sliceDoc(position, position + 1));
+            event.preventDefault();
+            view.dispatch({
+                changes: { from: position, insert: insertion.text },
+                selection: { anchor: position + insertion.cursorOffset },
+                userEvent: 'input.drop',
+            });
+            view.focus();
+            return true;
+        },
+        mouseover(event, view) {
+            const targetEl = event.target instanceof Element ? event.target.closest<HTMLElement>('.cook-source-reference') : null;
+            if (!targetEl) return false;
+            const found = referenceAtEvent(view, event);
+            if (found) handlers.hover(found.path, found.reference.target, event, targetEl, found.info);
+            return false;
+        },
+    }));
 }

@@ -1,15 +1,31 @@
 <script lang="ts">
-    import { buildIngredientDisplayGroups } from '../../utils/ingredientRows';
+    import type { Snippet } from 'svelte';
+    import { buildIngredientDisplayGroups, type IngredientDisplayGroup } from '../../utils/ingredientRows';
     import type { RecipeRenderModel } from '../types';
     import ReferenceLink from './ReferenceLink.svelte';
 
-    let { model }: { model: RecipeRenderModel } = $props();
-    let groups = $derived(buildIngredientDisplayGroups(model.recipe, model.settings));
+    let {
+        model,
+        groups: providedGroups,
+        title,
+        sectionId = 'cook-ingredients',
+        empty,
+    }: {
+        model: RecipeRenderModel;
+        /** Rows to show instead of the recipe's own ingredients (e.g. a menu's combined list). */
+        groups?: IngredientDisplayGroup[];
+        title?: string;
+        sectionId?: string;
+        /** Shown in the section when there are no rows; without it the section is omitted. */
+        empty?: Snippet;
+    } = $props();
+    let groups = $derived(providedGroups ?? buildIngredientDisplayGroups(model.recipe, model.settings));
 </script>
 
-{#if groups.length}
-    <section class="cook-ingredients" id="cook-ingredients">
-        <h2 class="cook-section-title">{model.settings.ingredientLabel || 'Ingredients'}</h2>
+{#if groups.length || empty}
+    <section class="cook-ingredients" id={sectionId}>
+        <h2 class="cook-section-title">{title ?? (model.settings.ingredientLabel || 'Ingredients')}</h2>
+        {#if !groups.length}{@render empty?.()}{/if}
         {#each groups as group, groupIndex}
             {#if group.name}
                 <h3 class="cook-ing-group-title">{group.name}</h3>
