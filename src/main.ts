@@ -34,6 +34,7 @@ import { TimerService } from './services/TimerService';
 import timerMp3 from './timer.mp3';
 import type { RecipeReferenceScaleRequest } from './utils/scaling';
 import { createUiInstanceId } from './ui/instanceIds';
+import { WeightTableLoader, type WeightTableStatus } from './services/WeightTableLoader';
 
 export default class CookPlugin extends Plugin {
 
@@ -47,6 +48,7 @@ export default class CookPlugin extends Plugin {
   private sessions!: RecipeSessions<WorkspaceLeaf, RecipeSession>;
   private routeTimeout: number | null = null;
   private routingReady = false;
+  private weightTable!: WeightTableLoader;
 
   saveData(data: CooklangSettings): Promise<void> {
     const settings = { ...data } as CooklangSettings & { lineWrap?: unknown };
@@ -83,13 +85,40 @@ export default class CookPlugin extends Plugin {
     this.sessions = new RecipeSessions(() => {
       const timers = new TimerService(this.settings, { tickSoundUrl: timerMp3, tickVolume: 0.3 }, this.alarms);
       const checkedIngredients = new Set<string>();
-      return { instanceId: createUiInstanceId('cook-session'), scale: 1, currentStep: -1, checkedIngredients, pendingReferenceScale: null, timers,
+      return { instanceId: createUiInstanceId('cook-session'), scale: 1, currentStep: -1, checkedIngredients, measure: null, pendingReferenceScale: null, timers,
         dispose: () => { timers.dispose(); checkedIngredients.clear(); } };
     });
     this.register(() => {
       this.sessions.dispose();
       if (this.routeTimeout !== null) window.clearTimeout(this.routeTimeout);
     });
+
+    this.weightTable = new WeightTableLoader({
+      read: async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile ? this.app.vault.read(file) : null;
+      },
+      parseYaml,
+      changed: () => {
+        if (this.disposed) return;
+        this.reloadCookViews();
+        for (const child of this.renderChildren) void child.refresh();
+      },
+    });
+    const reloadWeightsFor = (path: string) => {
+      if (path && path === this.settings.weightsFile.trim()) void this.reloadWeights(true);
+    };
+    this.registerEvent(this.app.vault.on('modify', file => reloadWeightsFor(file.path)));
+    this.registerEvent(this.app.vault.on('create', file => reloadWeightsFor(file.path)));
+    this.registerEvent(this.app.vault.on('delete', file => reloadWeightsFor(file.path)));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      if (oldPath !== this.settings.weightsFile.trim()) return;
+      // Follow the file so the setting keeps pointing at the same table.
+      this.settings.weightsFile = file.path;
+      void this.saveData(this.settings);
+      void this.reloadWeights();
+    }));
+    this.app.workspace.onLayoutReady(() => { if (!this.disposed) void this.reloadWeights(); });
 
     // register a custom icon
     this.addDocumentIcon("cook");
@@ -114,7 +143,8 @@ export default class CookPlugin extends Plugin {
       el.empty();
       const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
       const child = new RecipeEmbedChild(el, el, this.app, file instanceof TFile ? file : null,
-        () => this.settings, this.recipeHost, source, () => this.renderChildren.delete(child));
+        () => this.settings, this.recipeHost, () => this.weightTable.weights, source,
+        () => this.renderChildren.delete(child));
       this.renderChildren.add(child);
       ctx.addChild(child);
       await child.refresh();
@@ -139,7 +169,7 @@ export default class CookPlugin extends Plugin {
       root.classList.add('cook-recipe-note-embed');
       root.appendChild(target);
       const child = new RecipeEmbedChild(el, target, this.app, file, () => this.settings,
-        this.recipeHost, undefined, () => {
+        this.recipeHost, () => this.weightTable.weights, undefined, () => {
           embeds.release(root, cleanup);
           this.renderChildren.delete(child);
         });
@@ -490,7 +520,21 @@ export default class CookPlugin extends Plugin {
   // function to create the view
   cookViewCreator = (leaf: WorkspaceLeaf) => {
     return new CookView(leaf, this.settings, path => this.sessions.acquire(leaf, path),
-      this.editAsMarkdown, this.recipeHost);
+      this.editAsMarkdown, this.recipeHost, () => this.weightTable.weights);
+  }
+
+  weightsStatus(): WeightTableStatus | null {
+    return this.weightTable.status;
+  }
+
+  /** Reloads the weights file; edits to the file report problems as a notice. */
+  async reloadWeights(notify = false): Promise<WeightTableStatus | null> {
+    const status = await this.weightTable.load(this.settings.weightsFile);
+    if (status?.errors.length) {
+      console.warn('Cooklang weights file:', status.errors);
+      if (notify) new Notice(`Cooklang weights file: ${status.errors.join(' ')}`);
+    }
+    return status;
   }
 
   reloadCookViews() {

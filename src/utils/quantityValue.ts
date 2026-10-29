@@ -13,8 +13,23 @@
 export function numericFromQuantity(quantity: any): number | null {
     const value = quantity?.value;
     if (!value || value.type !== 'number') return null;
+    return numericFromNumber(value.value);
+}
 
-    const inner = value.value;
+/**
+ * Extract the endpoints of a range quantity:
+ *   { type: 'range', value: { start: <number>, end: <number> } }
+ * where each endpoint is a regular or fraction number as above.
+ */
+export function rangeFromQuantity(quantity: any): { start: number; end: number } | null {
+    const value = quantity?.value;
+    if (!value || value.type !== 'range') return null;
+    const start = numericFromNumber(value.value?.start);
+    const end = numericFromNumber(value.value?.end);
+    return start !== null && end !== null ? { start, end } : null;
+}
+
+function numericFromNumber(inner: any): number | null {
     if (inner?.type === 'regular') {
         const n = Number(inner.value);
         return Number.isFinite(n) ? n : null;

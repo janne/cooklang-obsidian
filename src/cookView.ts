@@ -9,6 +9,7 @@ import { writable } from 'svelte/store';
 import CookViewRoot from './ui/CookViewRoot.svelte';
 import type { RecipeHostAdapter, RecipeRenderModel } from './ui/types';
 import { recipeName } from './utils/recipeFiles';
+import type { WeightConverter } from './utils/weightConversion';
 
 /** Interactive preview only. Obsidian owns every source editor. */
 export class CookView extends TextFileView {
@@ -20,7 +21,8 @@ export class CookView extends TextFileView {
     constructor(leaf: WorkspaceLeaf, private settings: CooklangSettings,
         private acquireSession: (path: string) => RecipeSession,
         private editSource: (leaf: WorkspaceLeaf) => Promise<void>,
-        private host: RecipeHostAdapter) {
+        private host: RecipeHostAdapter,
+        private weights: () => WeightConverter | null) {
         super(leaf);
         this.component = mount(CookViewRoot, { target: this.contentEl, props: { preview: this.previewStore } });
         this.scope = new Scope(this.app.scope);
@@ -75,7 +77,7 @@ export class CookView extends TextFileView {
     getState(): Record<string, unknown> {
         const session = this.currentSession;
         return { ...super.getState(), mode: 'preview', scale: session?.scale ?? 1,
-            currentStep: session?.currentStep ?? -1 };
+            currentStep: session?.currentStep ?? -1, measure: session?.measure ?? null };
     }
 
     async setState(state: Record<string, unknown>, result: ViewStateResult): Promise<void> {
@@ -86,6 +88,7 @@ export class CookView extends TextFileView {
             if (typeof state.scale === 'number' && Number.isFinite(state.scale) && state.scale > 0) session.scale = state.scale;
             if (typeof state.currentStep === 'number' && Number.isInteger(state.currentStep)) session.currentStep = state.currentStep;
             if (isReferenceScaleRequest(state.referenceScale)) session.pendingReferenceScale = state.referenceScale;
+            if (state.measure === 'volume' || state.measure === 'weight') session.measure = state.measure;
         }
         // Migrate previously persisted standalone source editors after setState completes.
         if (state.mode === 'source') {
@@ -114,9 +117,10 @@ export class CookView extends TextFileView {
             parseServingsValue(baseRecipe.servings), session.scale);
         this.previewStore.set({
             instanceId: session.instanceId, interactive: true, recipe, file: this.file,
-            settings: this.settings, host: this.host, timers: session.timers,
+            settings: this.settings, host: this.host, timers: session.timers, weights: this.weights(),
             state: { scale: session.scale, baseServings, displayServings,
-                checkedIngredients: session.checkedIngredients, currentStep: session.currentStep },
+                checkedIngredients: session.checkedIngredients, currentStep: session.currentStep,
+                measure: session.measure ?? (this.settings.preferWeight ? 'weight' : 'volume') },
             callbacks: {
                 onScaleChange: target => {
                     if (baseServings == null) return;
@@ -130,6 +134,10 @@ export class CookView extends TextFileView {
                 },
                 onStepActivate: index => {
                     session.currentStep = session.currentStep === index ? -1 : index;
+                    this.renderPreview();
+                },
+                onMeasureChange: measure => {
+                    session.measure = measure;
                     this.renderPreview();
                 },
             },

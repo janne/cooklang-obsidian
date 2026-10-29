@@ -1,10 +1,10 @@
 <script lang="ts">
     import { buildIngredientDisplayGroups } from '../../utils/ingredientRows';
-    import type { RecipeRenderModel } from '../types';
+    import { activeWeights, type RecipeRenderModel } from '../types';
     import ReferenceLink from './ReferenceLink.svelte';
 
     let { model }: { model: RecipeRenderModel } = $props();
-    let groups = $derived(buildIngredientDisplayGroups(model.recipe, model.settings));
+    let groups = $derived(buildIngredientDisplayGroups(model.recipe, model.settings, activeWeights(model)));
 </script>
 
 {#if groups.length}

@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { recipeHasWeightConversions } from '../../utils/ingredientRows';
     import { clampServings } from '../../utils/scaling';
+    import type { MeasureMode } from '../../utils/weightConversion';
     import type { RecipeRenderModel } from '../types';
 
     let { model }: { model: RecipeRenderModel } = $props();
@@ -8,6 +10,11 @@
         && model.state.baseServings !== null
         && model.state.displayServings !== null,
     );
+    let showMeasure = $derived(model.interactive && recipeHasWeightConversions(model.recipe, model.weights));
+    const measures: Array<{ value: MeasureMode; label: string }> = [
+        { value: 'volume', label: 'Volume' },
+        { value: 'weight', label: 'Weight' },
+    ];
 
     function scrollTo(event: MouseEvent, selector: string): void {
         event.preventDefault();
@@ -27,6 +34,19 @@
             {model.settings.methodLabel || 'Steps'}
         </a>
     </div>
+
+    {#if showMeasure}
+        <div class="cook-measure" role="group" aria-label="Ingredient amounts">
+            {#each measures as measure}
+                <button
+                    type="button"
+                    class="cook-measure-btn"
+                    aria-pressed={model.state.measure === measure.value}
+                    onclick={() => model.callbacks.onMeasureChange(measure.value)}
+                >{measure.label}</button>
+            {/each}
+        </div>
+    {/if}
 
     {#if showScaler && model.state.displayServings !== null}
         <div class="cook-stepper">
