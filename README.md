@@ -37,7 +37,8 @@ Step tracking), falling back to a simple stacked list.
 
 ### Volume to weight
 
-Point **Weights file** in the plugin settings at a YAML file in your vault to convert
+Point **Weights file** in the plugin settings at a YAML file, or a Markdown note whose
+first ` ```yaml ` block holds the table (editable in Obsidian), to convert
 ingredient amounts to grams (rounded to whole grams). When a recipe has convertible
 amounts, the sticky bar shows a **Volume / Weight** toggle; **Prefer weights** chooses
 which one recipes open with, and Markdown embeds always follow that setting.
@@ -52,7 +53,7 @@ currypasta:
   - röd currypasta
 ```
 
-Each entry needs `grams_per_100ml`; `aliases` is optional. Names match
+The path is relative to the vault root; for a note, `.md` may be left out. Each entry needs `grams_per_100ml`; `aliases` is optional. Names match
 case-insensitively, and plurals ending in `-s`/`-es` match the singular. Volume units
 include `ml`, `dl`, `l`, `cup`, `tbsp`, `tsp` and the Swedish `msk`, `tsk` and `krm`.
 Mass units such as `oz` and `lb` convert to grams without an entry. Ranges such as

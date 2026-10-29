@@ -35,6 +35,7 @@ import timerMp3 from './timer.mp3';
 import type { RecipeReferenceScaleRequest } from './utils/scaling';
 import { createUiInstanceId } from './ui/instanceIds';
 import { WeightTableLoader, type WeightTableStatus } from './services/WeightTableLoader';
+import { weightsFileCandidates } from './utils/weightConversion';
 
 export default class CookPlugin extends Plugin {
 
@@ -105,14 +106,15 @@ export default class CookPlugin extends Plugin {
         for (const child of this.renderChildren) void child.refresh();
       },
     });
+    const isWeightsFile = (path: string) => weightsFileCandidates(this.settings.weightsFile).includes(path);
     const reloadWeightsFor = (path: string) => {
-      if (path && path === this.settings.weightsFile.trim()) void this.reloadWeights(true);
+      if (isWeightsFile(path)) void this.reloadWeights(true);
     };
     this.registerEvent(this.app.vault.on('modify', file => reloadWeightsFor(file.path)));
     this.registerEvent(this.app.vault.on('create', file => reloadWeightsFor(file.path)));
     this.registerEvent(this.app.vault.on('delete', file => reloadWeightsFor(file.path)));
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
-      if (oldPath !== this.settings.weightsFile.trim()) return;
+      if (!isWeightsFile(oldPath)) return;
       // Follow the file so the setting keeps pointing at the same table.
       this.settings.weightsFile = file.path;
       void this.saveData(this.settings);

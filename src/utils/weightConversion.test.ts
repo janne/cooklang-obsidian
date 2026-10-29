@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createWeightConverter, parseWeightTable } from './weightConversion';
+import {
+    createWeightConverter,
+    parseWeightTable,
+    weightsFileCandidates,
+    weightsYamlSource,
+} from './weightConversion';
 
 function converter(data: unknown) {
     return createWeightConverter(parseWeightTable(data).table);
@@ -78,5 +83,43 @@ describe('createWeightConverter', () => {
         expect(weights.toGrams(['vetemjöl'], 1, 'krm')).toBe(1);
         expect(weights.toGrams(['vetemjöl'], 0.5, 'krm')).toBeNull();
         expect(weights.toGrams(['vetemjöl'], 0, 'dl')).toBeNull();
+    });
+});
+
+describe('weights file location and source', () => {
+    it('tries the path as written, then with .md like a wikilink', () => {
+        expect(weightsFileCandidates('Recept/Tabeller/weights.yaml')).toEqual([
+            'Recept/Tabeller/weights.yaml',
+            'Recept/Tabeller/weights.yaml.md',
+        ]);
+        expect(weightsFileCandidates(' /Recept/weights.yaml.md ')).toEqual(['Recept/weights.yaml.md']);
+        expect(weightsFileCandidates('  ')).toEqual([]);
+    });
+
+    it('uses a YAML file as is', () => {
+        expect(weightsYamlSource('weights.yaml', 'couscous:\n  grams_per_100ml: 73\n'))
+            .toBe('couscous:\n  grams_per_100ml: 73\n');
+    });
+
+    it('reads the first yaml block of a Markdown note', () => {
+        const note = [
+            '# Vikter',
+            '',
+            '```js',
+            'ignored: 1',
+            '```',
+            '',
+            '```yaml',
+            'couscous:',
+            '  grams_per_100ml: 73',
+            '```',
+            '',
+            '```yml',
+            'second: 1',
+            '```',
+        ].join('\n');
+        expect(weightsYamlSource('Tabeller/weights.yaml.md', note)).toBe('couscous:\n  grams_per_100ml: 73\n');
+        expect(weightsYamlSource('w.md', '~~~yml\nsalt:\n  grams_per_100ml: 120\n~~~')).toBe('salt:\n  grams_per_100ml: 120\n');
+        expect(weightsYamlSource('w.md', 'Just text')).toBeNull();
     });
 });

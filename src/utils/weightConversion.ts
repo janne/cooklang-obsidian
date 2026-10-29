@@ -10,6 +10,8 @@
  *     aliases:
  *     - röd currypasta
  *
+ * The table can also live in a Markdown note, inside its first ```yaml block.
+ *
  * Mass units (oz, lb, kg, ...) convert to grams without a table entry.
  * Results are rounded to whole grams. Pure so it runs under Node-based Vitest.
  */
@@ -55,6 +57,23 @@ const MILLILITRE = unitMath.unit('ml');
 /** Case matters only where lowercasing changes meaning (T = tablespoon, t = tonne). */
 const CASE_SENSITIVE_UNITS: Record<string, string> = { T: 'tbsp', t: 'tsp' };
 const UNIT_ALIASES: Record<string, string> = { 'fl oz': 'floz', 'fl. oz.': 'floz' };
+
+/** Paths to try for a configured weights file; like a wikilink, ".md" may be omitted. */
+export function weightsFileCandidates(path: string): string[] {
+    const trimmed = path.trim().replace(/^\/+/, '');
+    if (!trimmed) return [];
+    return trimmed.toLowerCase().endsWith('.md') ? [trimmed] : [trimmed, `${trimmed}.md`];
+}
+
+/**
+ * The YAML text in a weights file: the whole file for .yaml/.yml, or the first
+ * ```yaml (or ```yml) fenced block of a Markdown note. Null when a note has none.
+ */
+export function weightsYamlSource(path: string, text: string): string | null {
+    if (!path.toLowerCase().endsWith('.md')) return text;
+    const match = /^[ \t]*(`{3,}|~{3,})[ \t]*ya?ml[ \t]*\r?\n([\s\S]*?)^[ \t]*\1[ \t]*$/im.exec(text);
+    return match ? match[2] ?? '' : null;
+}
 
 export function normalizeName(name: string): string {
     return name.trim().toLowerCase().replace(/\s+/g, ' ');

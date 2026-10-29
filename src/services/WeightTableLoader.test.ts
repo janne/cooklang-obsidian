@@ -55,4 +55,20 @@ describe('WeightTableLoader', () => {
         expect(loader.weights?.toGrams(['flour'], 1, 'dl')).toBeNull();
         expect(h.changed).toHaveBeenCalledTimes(1);
     });
+
+    it('reads the yaml block of a note, with or without the .md suffix', async () => {
+        const note = '# Vikter\n\n```yaml\n{"couscous": {"grams_per_100ml": 73}}\n```\n';
+        const h = host({ 'Tabeller/weights.yaml.md': note });
+        const loader = new WeightTableLoader(h);
+        expect(await loader.load('Tabeller/weights.yaml')).toEqual({ path: 'Tabeller/weights.yaml.md', entries: 1, errors: [] });
+        expect(loader.weights?.toGrams(['couscous'], 1, 'dl')).toBe(73);
+        expect(await loader.load('Tabeller/weights.yaml.md')).toEqual({ path: 'Tabeller/weights.yaml.md', entries: 1, errors: [] });
+    });
+
+    it('reports a note without a yaml block', async () => {
+        const loader = new WeightTableLoader(host({ 'weights.md': 'No table here' }));
+        const status = await loader.load('weights');
+        expect(loader.weights).toBeNull();
+        expect(status?.errors).toEqual(['No ```yaml block found in weights.md']);
+    });
 });

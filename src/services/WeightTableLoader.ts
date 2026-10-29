@@ -1,6 +1,8 @@
 import {
     createWeightConverter,
     parseWeightTable,
+    weightsFileCandidates,
+    weightsYamlSource,
     type WeightConverter,
 } from '../utils/weightConversion';
 
@@ -30,22 +32,30 @@ export class WeightTableLoader {
 
     async load(path: string): Promise<WeightTableStatus | null> {
         const revision = ++this.revision;
-        const trimmed = path.trim();
+        const candidates = weightsFileCandidates(path);
         let converter: WeightConverter | null = null;
         let status: WeightTableStatus | null = null;
-        if (trimmed) {
+        if (candidates.length) {
+            let resolved = candidates[0]!;
             try {
-                const text = await this.host.read(trimmed);
+                let text: string | null = null;
+                for (const candidate of candidates) {
+                    text = await this.host.read(candidate);
+                    if (text !== null) { resolved = candidate; break; }
+                }
+                const yaml = text === null ? null : weightsYamlSource(resolved, text);
                 if (text === null) {
-                    status = { path: trimmed, entries: 0, errors: [`File not found: ${trimmed}`] };
+                    status = { path: resolved, entries: 0, errors: [`File not found: ${resolved}`] };
+                } else if (yaml === null) {
+                    status = { path: resolved, entries: 0, errors: [`No \`\`\`yaml block found in ${resolved}`] };
                 } else {
-                    const { table, errors } = parseWeightTable(this.host.parseYaml(text));
+                    const { table, errors } = parseWeightTable(this.host.parseYaml(yaml));
                     converter = createWeightConverter(table);
-                    status = { path: trimmed, entries: table.entries.size, errors };
+                    status = { path: resolved, entries: table.entries.size, errors };
                 }
             } catch (error) {
-                status = { path: trimmed, entries: 0,
-                    errors: [`Could not load ${trimmed}: ${error instanceof Error ? error.message : String(error)}`] };
+                status = { path: resolved, entries: 0,
+                    errors: [`Could not load ${resolved}: ${error instanceof Error ? error.message : String(error)}`] };
             }
         }
         if (revision !== this.revision) return this.status;

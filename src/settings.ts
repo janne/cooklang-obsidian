@@ -9,9 +9,9 @@ declare class CookPlugin extends Plugin {
   weightsStatus(): WeightTableStatus | null;
 }
 
-const WEIGHTS_FILE_EXTENSIONS = ['yaml', 'yml'];
+const WEIGHTS_FILE_EXTENSIONS = ['yaml', 'yml', 'md'];
 
-/** Suggests YAML files in the vault for the weights file setting. */
+/** Suggests YAML files and Markdown notes in the vault for the weights file setting. */
 class YamlFileSuggest extends AbstractInputSuggest<TFile> {
   constructor(app: App, private inputEl: HTMLInputElement, private onPick: (path: string) => void) {
     super(app, inputEl);
@@ -21,7 +21,8 @@ class YamlFileSuggest extends AbstractInputSuggest<TFile> {
     const needle = query.trim().toLowerCase();
     return this.app.vault.getFiles()
       .filter(file => WEIGHTS_FILE_EXTENSIONS.includes(file.extension) && file.path.toLowerCase().includes(needle))
-      .sort((a, b) => a.path.localeCompare(b.path))
+      // YAML files first; notes only qualify through their ```yaml block.
+      .sort((a, b) => Number(a.extension === 'md') - Number(b.extension === 'md') || a.path.localeCompare(b.path))
       .slice(0, 50);
   }
 
@@ -37,7 +38,7 @@ class YamlFileSuggest extends AbstractInputSuggest<TFile> {
 }
 
 function describeWeightsStatus(status: WeightTableStatus | null): string {
-  if (!status) return 'A YAML file in your vault mapping ingredients to grams_per_100ml.';
+  if (!status) return 'A YAML file, or a note with a ```yaml block, mapping ingredients to grams_per_100ml.';
   const loaded = `${status.entries} ingredient name${status.entries === 1 ? '' : 's'} loaded from ${status.path}.`;
   return status.errors.length ? `${loaded} ${status.errors.join(' ')}` : loaded;
 }
