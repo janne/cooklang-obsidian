@@ -21,7 +21,7 @@ class YamlFileSuggest extends AbstractInputSuggest<TFile> {
     const needle = query.trim().toLowerCase();
     return this.app.vault.getFiles()
       .filter(file => WEIGHTS_FILE_EXTENSIONS.includes(file.extension) && file.path.toLowerCase().includes(needle))
-      // YAML files first; notes only qualify through their ```yaml block.
+      // YAML files first, then notes.
       .sort((a, b) => Number(a.extension === 'md') - Number(b.extension === 'md') || a.path.localeCompare(b.path))
       .slice(0, 50);
   }
@@ -38,7 +38,7 @@ class YamlFileSuggest extends AbstractInputSuggest<TFile> {
 }
 
 function describeWeightsStatus(status: WeightTableStatus | null): string {
-  if (!status) return 'A YAML file, or a note with a ```yaml block, mapping ingredients to grams_per_100ml.';
+  if (!status) return 'A YAML file or note mapping ingredients to grams_per_100ml. Lines starting with ``` are ignored.';
   const loaded = `${status.entries} ingredient name${status.entries === 1 ? '' : 's'} loaded from ${status.path}.`;
   return status.errors.length ? `${loaded} ${status.errors.join(' ')}` : loaded;
 }

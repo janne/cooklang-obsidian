@@ -10,7 +10,7 @@
  *     aliases:
  *     - röd currypasta
  *
- * The table can also live in a Markdown note, inside its first ```yaml block.
+ * The file may be a Markdown note; ``` fence lines around the YAML are ignored.
  *
  * Mass units (oz, lb, kg, ...) convert to grams without a table entry.
  * Results are rounded to whole grams. Pure so it runs under Node-based Vitest.
@@ -65,14 +65,9 @@ export function weightsFileCandidates(path: string): string[] {
     return trimmed.toLowerCase().endsWith('.md') ? [trimmed] : [trimmed, `${trimmed}.md`];
 }
 
-/**
- * The YAML text in a weights file: the whole file for .yaml/.yml, or the first
- * ```yaml (or ```yml) fenced block of a Markdown note. Null when a note has none.
- */
-export function weightsYamlSource(path: string, text: string): string | null {
-    if (!path.toLowerCase().endsWith('.md')) return text;
-    const match = /^[ \t]*(`{3,}|~{3,})[ \t]*ya?ml[ \t]*\r?\n([\s\S]*?)^[ \t]*\1[ \t]*$/im.exec(text);
-    return match ? match[2] ?? '' : null;
+/** The YAML text of a weights file, ignoring any ``` or ~~~ fence lines around it. */
+export function weightsYamlSource(text: string): string {
+    return text.split(/\r?\n/).filter(line => !/^[ \t]*(`{3,}|~{3,})/.test(line)).join('\n');
 }
 
 export function normalizeName(name: string): string {

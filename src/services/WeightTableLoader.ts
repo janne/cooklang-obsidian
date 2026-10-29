@@ -43,13 +43,10 @@ export class WeightTableLoader {
                     text = await this.host.read(candidate);
                     if (text !== null) { resolved = candidate; break; }
                 }
-                const yaml = text === null ? null : weightsYamlSource(resolved, text);
                 if (text === null) {
                     status = { path: resolved, entries: 0, errors: [`File not found: ${resolved}`] };
-                } else if (yaml === null) {
-                    status = { path: resolved, entries: 0, errors: [`No \`\`\`yaml block found in ${resolved}`] };
                 } else {
-                    const { table, errors } = parseWeightTable(this.host.parseYaml(yaml));
+                    const { table, errors } = parseWeightTable(this.host.parseYaml(weightsYamlSource(text)));
                     converter = createWeightConverter(table);
                     status = { path: resolved, entries: table.entries.size, errors };
                 }

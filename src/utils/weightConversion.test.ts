@@ -96,30 +96,10 @@ describe('weights file location and source', () => {
         expect(weightsFileCandidates('  ')).toEqual([]);
     });
 
-    it('uses a YAML file as is', () => {
-        expect(weightsYamlSource('weights.yaml', 'couscous:\n  grams_per_100ml: 73\n'))
-            .toBe('couscous:\n  grams_per_100ml: 73\n');
-    });
-
-    it('reads the first yaml block of a Markdown note', () => {
-        const note = [
-            '# Vikter',
-            '',
-            '```js',
-            'ignored: 1',
-            '```',
-            '',
-            '```yaml',
-            'couscous:',
-            '  grams_per_100ml: 73',
-            '```',
-            '',
-            '```yml',
-            'second: 1',
-            '```',
-        ].join('\n');
-        expect(weightsYamlSource('Tabeller/weights.yaml.md', note)).toBe('couscous:\n  grams_per_100ml: 73\n');
-        expect(weightsYamlSource('w.md', '~~~yml\nsalt:\n  grams_per_100ml: 120\n~~~')).toBe('salt:\n  grams_per_100ml: 120\n');
-        expect(weightsYamlSource('w.md', 'Just text')).toBeNull();
+    it('drops fence lines and keeps everything else', () => {
+        const yaml = 'couscous:\n  grams_per_100ml: 73';
+        expect(weightsYamlSource(yaml)).toBe(yaml);
+        expect(weightsYamlSource('```yaml\ncouscous:\n  grams_per_100ml: 73\n```\n')).toBe(`${yaml}\n`);
+        expect(weightsYamlSource('~~~yml\r\ncouscous:\r\n  grams_per_100ml: 73\r\n~~~')).toBe(yaml);
     });
 });
