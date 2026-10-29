@@ -1,0 +1,11 @@
+# Weights table for the "Weights file" setting.
+# Keys are ingredient names (case-insensitive; plurals match the singular).
+# grams_per_100ml converts any volume unit (ml, dl, l, cup, tbsp, tsp, msk, tsk, krm, ...).
+coconut milk:
+  grams_per_100ml: 102
+fish sauce:
+  grams_per_100ml: 120
+green curry paste:
+  grams_per_100ml: 110
+  aliases:
+  - curry paste

@@ -1,10 +1,45 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { CookView } from './cookView';
+import { AbstractInputSuggest, App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { RECIPE_FORMATS, type RecipeFormat } from './utils/recipeFiles';
+import type { WeightTableStatus } from './services/WeightTableLoader';
 
 declare class CookPlugin extends Plugin {
   settings: CooklangSettings;
   reloadCookViews(): void;
+  reloadWeights(): Promise<WeightTableStatus | null>;
+  weightsStatus(): WeightTableStatus | null;
+}
+
+const WEIGHTS_FILE_EXTENSIONS = ['yaml', 'yml'];
+
+/** Suggests YAML files in the vault for the weights file setting. */
+class YamlFileSuggest extends AbstractInputSuggest<TFile> {
+  constructor(app: App, private inputEl: HTMLInputElement, private onPick: (path: string) => void) {
+    super(app, inputEl);
+  }
+
+  getSuggestions(query: string): TFile[] {
+    const needle = query.trim().toLowerCase();
+    return this.app.vault.getFiles()
+      .filter(file => WEIGHTS_FILE_EXTENSIONS.includes(file.extension) && file.path.toLowerCase().includes(needle))
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .slice(0, 50);
+  }
+
+  renderSuggestion(file: TFile, el: HTMLElement): void {
+    el.setText(file.path);
+  }
+
+  selectSuggestion(file: TFile): void {
+    this.setValue(file.path);
+    this.onPick(file.path);
+    this.close();
+  }
+}
+
+function describeWeightsStatus(status: WeightTableStatus | null): string {
+  if (!status) return 'A YAML file in your vault mapping ingredients to grams_per_100ml.';
+  const loaded = `${status.entries} ingredient name${status.entries === 1 ? '' : 's'} loaded from ${status.path}.`;
+  return status.errors.length ? `${loaded} ${status.errors.join(' ')}` : loaded;
 }
 
 export class CooklangSettings {
@@ -24,6 +59,10 @@ export class CooklangSettings {
   defaultView: 'source' | 'preview' = 'source';
   defaultRecipeFormat: RecipeFormat = 'cook';
   showServingsScaler: boolean = true;
+  /** Vault path of the YAML table used for volume-to-weight conversion. */
+  weightsFile: string = "";
+  /** Show amounts as weights by default when the table can convert them. */
+  preferWeight: boolean = false;
   twoColumnLayout: boolean = true;
   enableStepTracking: boolean = true;
   servingsLabel: string = "";
@@ -130,6 +169,37 @@ export class CookSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.showServingsScaler)
         .onChange((value: boolean) => {
           this.plugin.settings.showServingsScaler = value;
+          this.plugin.saveData(this.plugin.settings);
+          this.plugin.reloadCookViews();
+        }));
+
+    const weightsSetting = new Setting(containerEl)
+      .setName('Weights file')
+      .setDesc(describeWeightsStatus(this.plugin.weightsStatus()));
+    const applyWeightsFile = async (path: string) => {
+      if (path === this.plugin.settings.weightsFile) return;
+      this.plugin.settings.weightsFile = path;
+      await this.plugin.saveData(this.plugin.settings);
+      const status = await this.plugin.reloadWeights();
+      if (this.plugin.settings.weightsFile === path) weightsSetting.setDesc(describeWeightsStatus(status));
+    };
+    weightsSetting.addSearch(search => {
+      search
+        .setPlaceholder('Kitchen/weights.yaml')
+        .setValue(this.plugin.settings.weightsFile);
+      new YamlFileSuggest(this.app, search.inputEl, path => { void applyWeightsFile(path); });
+      // Typed paths apply on blur/enter so partial input doesn't reload on every keystroke.
+      search.inputEl.addEventListener('change', () => { void applyWeightsFile(search.getValue().trim()); });
+      search.onChange(value => { if (!value) void applyWeightsFile(''); });
+    });
+
+    new Setting(containerEl)
+      .setName('Prefer weights')
+      .setDesc('Show ingredient amounts in grams by default. The recipe preview has a volume/weight toggle; embeds follow this setting.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.preferWeight)
+        .onChange((value: boolean) => {
+          this.plugin.settings.preferWeight = value;
           this.plugin.saveData(this.plugin.settings);
           this.plugin.reloadCookViews();
         }));

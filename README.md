@@ -35,6 +35,31 @@ Opening a recipe in Preview shows a single rich recipe page:
 Each of these can be toggled in the plugin settings (Servings scaler, Two-column layout,
 Step tracking), falling back to a simple stacked list.
 
+### Volume to weight
+
+Point **Weights file** in the plugin settings at a YAML file in your vault to convert
+ingredient amounts to grams (rounded to whole grams). When a recipe has convertible
+amounts, the sticky bar shows a **Volume / Weight** toggle; **Prefer weights** chooses
+which one recipes open with, and Markdown embeds always follow that setting.
+
+```yaml
+couscous:
+  grams_per_100ml: 73
+currypasta:
+  grams_per_100ml: 101
+  aliases:
+  - grön currypasta
+  - röd currypasta
+```
+
+Each entry needs `grams_per_100ml`; `aliases` is optional. Names match
+case-insensitively, and plurals ending in `-s`/`-es` match the singular. Volume units
+include `ml`, `dl`, `l`, `cup`, `tbsp`, `tsp` and the Swedish `msk`, `tsk` and `krm`.
+Mass units such as `oz` and `lb` convert to grams without an entry. Ranges such as
+`2-3 dl` become weight ranges (`100–150 g`). Counts, unknown ingredients and unknown
+units stay as written. The file is reloaded when it changes; see
+`test-recipes/weights.yaml` for an example.
+
 ## Markdown recipes
 
 Recipes can be stored in three formats:

@@ -9,6 +9,7 @@ import { RecipeEmbedSession } from '../services/RecipeEmbedSession';
 import { embedSettings } from '../utils/embedSettings';
 import { isRecipeFile } from '../utils/recipeFiles';
 import { createUiInstanceId } from './instanceIds';
+import type { WeightConverter } from '../utils/weightConversion';
 
 export class RecipeEmbedChild extends MarkdownRenderChild {
     private session: RecipeEmbedSession;
@@ -21,6 +22,7 @@ export class RecipeEmbedChild extends MarkdownRenderChild {
         private file: TFile | null,
         settings: () => CooklangSettings,
         host: RecipeHostAdapter,
+        weights: () => WeightConverter | null,
         private source?: string,
         private cleanup: () => void = () => {},
     ) {
@@ -36,13 +38,19 @@ export class RecipeEmbedChild extends MarkdownRenderChild {
                 : file ? app.vault.read(file) : Promise.reject(new Error('Recipe file is missing.')),
             initialize: () => parserService.initialize(),
             parse: text => parserService.parse(text)[0],
-            model: recipe => ({
-                instanceId, interactive: false, recipe, file,
-                settings: embedSettings(settings()), host, timers: null,
-                state: { scale: 1, baseServings: null, displayServings: null,
-                    checkedIngredients: new Set<string>(), currentStep: -1 },
-                callbacks: { onScaleChange: () => {}, onIngredientToggle: () => {}, onStepActivate: () => {} },
-            }),
+            model: recipe => {
+                const embedded = embedSettings(settings());
+                // Embeds have no toggle; they follow the preferred measure.
+                return {
+                    instanceId, interactive: false, recipe, file,
+                    settings: embedded, host, timers: null, weights: weights(),
+                    state: { scale: 1, baseServings: null, displayServings: null,
+                        checkedIngredients: new Set<string>(), currentStep: -1,
+                        measure: embedded.preferWeight ? 'weight' : 'volume' },
+                    callbacks: { onScaleChange: () => {}, onIngredientToggle: () => {}, onStepActivate: () => {},
+                        onMeasureChange: () => {} },
+                };
+            },
             publish: state => renderState.set(state),
         });
     }

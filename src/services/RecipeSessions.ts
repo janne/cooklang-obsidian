@@ -1,4 +1,5 @@
 import type { RecipeReferenceScaleRequest } from '../utils/scaling';
+import type { MeasureMode } from '../utils/weightConversion';
 import type { TimerService } from './TimerService';
 
 export interface RecipeSession {
@@ -6,6 +7,8 @@ export interface RecipeSession {
     scale: number;
     currentStep: number;
     checkedIngredients: Set<string>;
+    /** Explicit volume/weight choice; null follows the settings default. */
+    measure: MeasureMode | null;
     pendingReferenceScale: RecipeReferenceScaleRequest | null;
     timers: TimerService;
     dispose(): void;

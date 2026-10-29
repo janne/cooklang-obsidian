@@ -57,11 +57,13 @@ describe('RecipeEmbed', () => {
                 displayServings: null,
                 checkedIngredients: new Set(),
                 currentStep: -1,
+                measure: 'volume',
             },
             callbacks: {
                 onScaleChange: () => {},
                 onIngredientToggle: () => {},
                 onStepActivate: () => {},
+                onMeasureChange: () => {},
             },
             host: {
                 getResourcePath: () => '',
@@ -70,6 +72,7 @@ describe('RecipeEmbed', () => {
                 openWikiLink: () => {},
             },
             timers: null,
+            weights: null,
         } as unknown as RecipeRenderModel;
         const renderState = writable<EmbedRenderState>({ status: 'ready', model });
         const view = render(RecipeEmbed, { renderState });

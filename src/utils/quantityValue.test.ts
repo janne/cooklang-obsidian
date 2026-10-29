@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { numericFromQuantity } from './quantityValue';
+import { numericFromQuantity, rangeFromQuantity } from './quantityValue';
 
 const regular = (n: number) => ({ value: { type: 'number', value: { type: 'regular', value: n } } });
 const fraction = (whole: number, num: number, den: number) =>
@@ -26,5 +26,24 @@ describe('numericFromQuantity', () => {
 
     it('returns null for a zero denominator', () => {
         expect(numericFromQuantity(fraction(0, 1, 0))).toBeNull();
+    });
+});
+
+describe('rangeFromQuantity', () => {
+    const range = (start: unknown, end: unknown) => ({ value: { type: 'range', value: { start, end } } });
+
+    it('reads regular and fraction endpoints', () => {
+        expect(rangeFromQuantity(range({ type: 'regular', value: 2 }, { type: 'regular', value: 3 })))
+            .toEqual({ start: 2, end: 3 });
+        expect(rangeFromQuantity(range(
+            { type: 'fraction', value: { whole: 0, num: 1, den: 2 } },
+            { type: 'regular', value: 1 },
+        ))).toEqual({ start: 0.5, end: 1 });
+    });
+
+    it('returns null for numbers, text, and incomplete ranges', () => {
+        expect(rangeFromQuantity(regular(2))).toBeNull();
+        expect(rangeFromQuantity({ value: { type: 'text', value: 'some' } })).toBeNull();
+        expect(rangeFromQuantity(range({ type: 'regular', value: 2 }, null))).toBeNull();
     });
 });

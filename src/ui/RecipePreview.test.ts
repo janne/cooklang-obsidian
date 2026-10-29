@@ -12,6 +12,7 @@ import type {
     TimerController,
 } from './types';
 import type { TimerSnapshot } from '../services/TimerService';
+import { createWeightConverter, parseWeightTable } from '../utils/weightConversion';
 
 vi.mock('@cooklang/cooklang', () => ({
     ingredient_should_be_listed: () => true,
@@ -48,6 +49,8 @@ function settings() {
         defaultView: 'source' as const,
         defaultRecipeFormat: 'cook' as const,
         showServingsScaler: true,
+        weightsFile: '',
+        preferWeight: false,
         twoColumnLayout: true,
         enableStepTracking: true,
         servingsLabel: '',
@@ -158,6 +161,7 @@ function model(overrides: Partial<RecipeRenderModel> = {}): RecipeRenderModel {
         onScaleChange: vi.fn(),
         onIngredientToggle: vi.fn(),
         onStepActivate: vi.fn(),
+        onMeasureChange: vi.fn(),
     };
     const host: RecipeHostAdapter = {
         getResourcePath: file => file.path,
@@ -182,10 +186,12 @@ function model(overrides: Partial<RecipeRenderModel> = {}): RecipeRenderModel {
             displayServings: 4,
             checkedIngredients: new Set(),
             currentStep: -1,
+            measure: 'volume',
         },
         callbacks,
         host,
         timers,
+        weights: null,
         ...overrides,
     };
 }
@@ -677,5 +683,37 @@ describe('TimerButton', () => {
 
         view.unmount();
         expect(unsubscribe).toHaveBeenCalledOnce();
+    });
+});
+
+describe('volume/weight toggle', () => {
+    const weights = createWeightConverter(parseWeightTable({ flour: { grams_per_100ml: 53 } }).table);
+
+    it('is hidden without a weights table', () => {
+        render(RecipePreview, { model: model() });
+        expect(screen.queryByRole('group', { name: 'Ingredient amounts' })).toBeNull();
+    });
+
+    it('reports the chosen measure and keeps volume amounts in volume mode', async () => {
+        const renderModel = model({ weights });
+        render(RecipePreview, { model: renderModel });
+
+        const volume = screen.getByRole('button', { name: 'Volume' });
+        const weight = screen.getByRole('button', { name: 'Weight' });
+        expect(volume.getAttribute('aria-pressed')).toBe('true');
+        expect(weight.getAttribute('aria-pressed')).toBe('false');
+        expect(document.querySelector('.cook-ing-qty')?.textContent).toBe('2 cups');
+
+        await fireEvent.click(weight);
+        expect(renderModel.callbacks.onMeasureChange).toHaveBeenCalledWith('weight');
+    });
+
+    it('shows rounded grams in the list and inline in weight mode', () => {
+        const base = model();
+        render(RecipePreview, { model: model({ weights, state: { ...base.state, measure: 'weight' } }) });
+
+        expect(screen.getByRole('button', { name: 'Weight' }).getAttribute('aria-pressed')).toBe('true');
+        expect(document.querySelector('.cook-ing-qty')?.textContent).toBe('251 g');
+        expect(document.querySelector('.cook-ig .cook-amt')?.textContent).toBe('(251 g)');
     });
 });

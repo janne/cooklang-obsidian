@@ -216,6 +216,19 @@
   background: transparent; color: var(--text-muted); font-size: 1em; cursor: pointer; line-height: 1;
 }
 .cook-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.cook-measure {
+  margin-left: auto; display: flex; align-items: center; gap: 2px;
+  border: 1px solid var(--background-modifier-border); border-radius: 14px; height: 30px; padding: 0 3px;
+}
+.cook-measure + .cook-stepper { margin-left: 0; }
+.cook-measure-btn {
+  height: 24px; padding: 0 10px; border: none; border-radius: 12px; box-shadow: none;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; color: var(--text-muted); font-size: 0.85em; cursor: pointer;
+}
+.cook-measure-btn[aria-pressed="true"] {
+  background: var(--interactive-accent); color: var(--text-on-accent); font-weight: 600;
+}
 .cook-stepper-val { font-size: 0.85em; font-variant-numeric: tabular-nums; }
 .cook-stepper-val b { color: var(--text-normal); }
 
@@ -457,6 +470,7 @@
   a.cook-pill:hover { color: var(--text-normal); border-color: var(--text-accent); }
   .cook-bar-link:hover { color: var(--text-accent); }
   .cook-stepper-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+  .cook-measure-btn[aria-pressed="false"]:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
   .cook-step-toggle:hover { background: var(--background-modifier-hover); }
   .cook-ref-link:hover { text-decoration-style: solid; }
   .cook-timer-chip:hover { background: var(--background-modifier-hover); }
@@ -469,6 +483,7 @@
   a.cook-pill:active { color: var(--text-normal); border-color: var(--text-accent); }
   .cook-bar-link:active { color: var(--text-accent); }
   .cook-stepper-btn:active,
+  .cook-measure-btn[aria-pressed="false"]:active,
   .cook-step-toggle:active { background: var(--background-modifier-hover); color: var(--text-normal); }
   .cook-ref-link:active { text-decoration-style: solid; }
   .cook-timer-btn:active,
@@ -485,6 +500,8 @@
   }
   .cook-stepper { height: 50px; border-radius: 25px; padding: 0; }
   .cook-stepper-btn { width: 48px; height: 48px; }
+  .cook-measure { height: 50px; border-radius: 25px; padding: 0 1px; }
+  .cook-measure-btn { min-width: 48px; height: 48px; border-radius: 24px; padding: 0 14px; }
   .cook-ing { min-height: 48px; padding-block: 0; }
   .cook-ing-checkbox-hit {
     width: 48px; min-height: 48px;
@@ -585,6 +602,7 @@
 
 .cook-timer-notice-dismiss:focus-visible,
 .cook-stepper-btn:focus-visible,
+.cook-measure-btn:focus-visible,
 .cook-ing-checkbox:focus-visible,
 .cook-ing-details > summary:focus-visible,
 .cook-step-toggle:focus-visible,
@@ -603,6 +621,8 @@
   .cook-bar { flex-wrap: wrap; }
   .cook-stepper { min-height: 34px; }
   .cook-stepper-btn { width: 28px; height: 28px; }
+  .cook-measure { min-height: 34px; }
+  .cook-measure-btn { min-height: 28px; }
 }
 
 @container (max-width: 399px) {
