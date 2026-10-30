@@ -129,9 +129,24 @@ function addQuantity(accumulator: QuantityAccumulator, item: AggInput): void {
     }
 }
 
+const METRIC_MASS_UNITS = new Set(['g', 'gram']);
+
+/**
+ * Math.js's best unit, except that metric masses switch to kg at exactly 1000 g
+ * and keep gram precision there ("1 kg", "1.234 kg"); toBest keeps "1000 g" and
+ * rounds 1234 g to "1.23 kg".
+ */
+function formatUnitTotal(total: Unit): string {
+    const grams = total.units.length === 1 && METRIC_MASS_UNITS.has(total.units[0]!.unit.name)
+        ? total.toNumber('g')
+        : null;
+    if (grams !== null && grams >= 1000) return `${Math.round(grams) / 1000} kg`;
+    return total.toBest().format({ precision: 3 });
+}
+
 function displayQuantity(accumulator: QuantityAccumulator): string | null {
     const parts = accumulator.quantities.map(bucket => bucket.type === 'unit'
-        ? bucket.total.toBest().format({ precision: 3 })
+        ? formatUnitTotal(bucket.total)
         : bucket.unitDisplay
             ? `${formatQuantity(bucket.sum)} ${bucket.unitDisplay}`
             : formatQuantity(bucket.sum));

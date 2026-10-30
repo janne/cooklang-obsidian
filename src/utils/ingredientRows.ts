@@ -13,7 +13,7 @@ import {
 import { buildSectionGroups } from './ingredientSectionGroups';
 import { numericFromQuantity, rangeFromQuantity } from './quantityValue';
 import { getSections, hasNamedSections } from './sectionHelpers';
-import type { WeightConverter } from './weightConversion';
+import { formatGramRange, formatGrams, type WeightConverter } from './weightConversion';
 
 /** The converter for one ingredient (by display name), or null to show it as written. */
 export type WeightsFor = (ingredientName: string) => WeightConverter | null;
@@ -46,13 +46,13 @@ export function ingredientGramRangeText(ingredient: Ingredient, weights: WeightC
     const start = weights.toGrams(weightNames(ingredient), range.start, unit);
     const end = weights.toGrams(weightNames(ingredient), range.end, unit);
     if (start === null || end === null) return null;
-    return start === end ? `${start} g` : `${start}–${end} g`;
+    return formatGramRange(start, end);
 }
 
 /** Inline quantity text, shown in grams when a weight converter applies. */
 export function ingredientQuantityDisplay(ingredient: Ingredient, weights: WeightConverter | null): string {
     const grams = ingredientGrams(ingredient, weights);
-    if (grams !== null) return `${grams} g`;
+    if (grams !== null) return formatGrams(grams);
     return ingredientGramRangeText(ingredient, weights)
         ?? (ingredient.quantity ? quantity_display(ingredient.quantity) : '');
 }

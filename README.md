@@ -42,7 +42,7 @@ Point **Weights file** in the plugin settings at a YAML file or a Markdown note
 ingredient amounts to grams (rounded to whole grams). When a recipe has convertible
 amounts, the sticky bar shows a **Volume / Weight** toggle; **Prefer weights** chooses
 which one recipes open with, and Markdown embeds always follow that setting. In the
-preview's ingredient list, convertible amounts have a dashed outline and a swap icon;
+preview's ingredient list, convertible amounts have a swap icon before them;
 tap one to switch just that ingredient (the global toggle resets these).
 
 ```yaml
@@ -60,7 +60,8 @@ starting with ` ``` ` are ignored, so the YAML may be wrapped in a ` ```yaml ` b
 case-insensitively, and plurals ending in `-s`/`-es` match the singular. Volume units
 include `ml`, `dl`, `l`, `cup`, `tbsp`, `tsp` and the Swedish `msk`, `tsk` and `krm`.
 Mass units such as `oz` and `lb` convert to grams without an entry. Ranges such as
-`2-3 dl` become weight ranges (`100–150 g`). Counts, unknown ingredients and unknown
+`2-3 dl` become weight ranges (`100–150 g`), and amounts from 1000 g show in
+kilograms (`1 kg`, `1.234 kg`). Counts, unknown ingredients and unknown
 units stay as written. The file is reloaded when it changes; see
 `test-recipes/weights.yaml` for an example.
 

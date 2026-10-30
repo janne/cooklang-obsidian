@@ -118,4 +118,11 @@ describe('weight-aware ingredient rows', () => {
             ingredient('salt', 1, 'tsp'),
         ]), weights)]).toEqual(['flour']);
     });
+
+    it('shows conversions from 1000 g in kilograms, inline and as ranges', () => {
+        expect(ingredientQuantityDisplay(ingredient('flour', 2, 'l'), weights)).toBe('1 kg');
+        expect(ingredientQuantityDisplay(rangeIngredient('flour', 2, 3, 'l'), weights)).toBe('1–1.5 kg');
+        const groups = buildIngredientDisplayGroups(recipe([ingredient('flour', 2, 'l')]), settings, () => weights);
+        expect(groups[0]?.rows[0]?.displayQty).toBe('1 kg');
+    });
 });

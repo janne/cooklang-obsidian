@@ -52,6 +52,13 @@ describe('aggregateIngredients', () => {
         expect(reversed[0].displayQty).toBe('1.5 kilograms');
     });
 
+    it('shows metric masses from 1000 g in kilograms with gram precision', () => {
+        expect(aggregateIngredients([ing({ quantityValue: 1000, unit: 'g' })])[0].displayQty).toBe('1 kg');
+        expect(aggregateIngredients([ing({ quantityValue: 1234, unit: 'g' })])[0].displayQty).toBe('1.234 kg');
+        expect(aggregateIngredients([ing({ quantityValue: 999, unit: 'g' })])[0].displayQty).toBe('999 g');
+        expect(aggregateIngredients([ing({ quantityValue: 1, unit: 'lb' })])[0].displayQty).toBe('1 lb');
+    });
+
     it('uses Math.js to combine compatible units and select the best display unit', () => {
         const rows = aggregateIngredients([
             ing({ name: 'stock', quantityValue: 750, unit: 'ml' }),

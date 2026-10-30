@@ -70,6 +70,21 @@ export function weightsYamlSource(text: string): string {
     return text.split(/\r?\n/).filter(line => !/^[ \t]*(`{3,}|~{3,})/.test(line)).join('\n');
 }
 
+/** Whole grams for display: "250 g", or kilograms from 1000 g ("1 kg", "1.234 kg"). */
+export function formatGrams(grams: number): string {
+    const rounded = Math.round(grams);
+    return rounded >= 1000 ? `${rounded / 1000} kg` : `${rounded} g`;
+}
+
+/** A gram range in one unit when both ends share it: "200–300 g", "1–1.5 kg", "800 g–1.2 kg". */
+export function formatGramRange(start: number, end: number): string {
+    const [a, b] = [Math.round(start), Math.round(end)];
+    if (a === b) return formatGrams(a);
+    if (a >= 1000) return `${a / 1000}–${b / 1000} kg`;
+    if (b < 1000) return `${a}–${b} g`;
+    return `${formatGrams(a)}–${formatGrams(b)}`;
+}
+
 export function normalizeName(name: string): string {
     return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }

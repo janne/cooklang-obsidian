@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
     createWeightConverter,
+    formatGramRange,
+    formatGrams,
     parseWeightTable,
     weightsFileCandidates,
     weightsYamlSource,
@@ -101,5 +103,21 @@ describe('weights file location and source', () => {
         expect(weightsYamlSource(yaml)).toBe(yaml);
         expect(weightsYamlSource('```yaml\ncouscous:\n  grams_per_100ml: 73\n```\n')).toBe(`${yaml}\n`);
         expect(weightsYamlSource('~~~yml\r\ncouscous:\r\n  grams_per_100ml: 73\r\n~~~')).toBe(yaml);
+    });
+});
+
+describe('gram formatting', () => {
+    it('switches to kilograms at 1000 g with gram precision', () => {
+        expect(formatGrams(999.4)).toBe('999 g');
+        expect(formatGrams(1000)).toBe('1 kg');
+        expect(formatGrams(1234)).toBe('1.234 kg');
+        expect(formatGrams(2500.2)).toBe('2.5 kg');
+    });
+
+    it('keeps a range in one unit when both ends share it', () => {
+        expect(formatGramRange(200, 300)).toBe('200–300 g');
+        expect(formatGramRange(1000, 1500)).toBe('1–1.5 kg');
+        expect(formatGramRange(800, 1200)).toBe('800 g–1.2 kg');
+        expect(formatGramRange(1000.2, 999.8)).toBe('1 kg');
     });
 });
