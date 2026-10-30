@@ -9,6 +9,8 @@ export interface RecipeSession {
     checkedIngredients: Set<string>;
     /** Explicit volume/weight choice; null follows the settings default. */
     measure: MeasureMode | null;
+    /** Ingredients toggled to the opposite measure; cleared when the global choice changes. */
+    flippedMeasures: Set<string>;
     pendingReferenceScale: RecipeReferenceScaleRequest | null;
     timers: TimerService;
     dispose(): void;

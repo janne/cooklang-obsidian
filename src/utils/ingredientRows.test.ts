@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CooklangRecipe, Ingredient } from '@cooklang/cooklang';
 import {
     buildIngredientDisplayGroups,
+    weightConvertibleNames,
     ingredientQuantityDisplay,
     recipeHasWeightConversions,
 } from './ingredientRows';
@@ -53,7 +54,7 @@ describe('weight-aware ingredient rows', () => {
         const groups = buildIngredientDisplayGroups(
             recipe([ingredient('flour', 2, 'dl'), ingredient('flour', 50, 'g'), ingredient('salt', 1, 'tsp')]),
             settings,
-            weights,
+            () => weights,
         );
         expect(groups[0]?.rows.map(row => [row.name, row.displayQty])).toEqual([
             ['flour', '150 g'],
@@ -69,7 +70,7 @@ describe('weight-aware ingredient rows', () => {
     it('never converts recipe references', () => {
         const reference = ingredient('flour', 2, 'dl', { reference: { name: 'flour', components: [] } } as Partial<Ingredient>);
         expect(ingredientQuantityDisplay(reference, weights)).toBe('2 dl');
-        const groups = buildIngredientDisplayGroups(recipe([reference]), settings, weights);
+        const groups = buildIngredientDisplayGroups(recipe([reference]), settings, () => weights);
         expect(groups[0]?.rows[0]?.reference).toEqual({ name: 'flour', components: [], quantity: 2, unit: 'dl' });
     });
 
@@ -92,8 +93,29 @@ describe('weight-aware ingredient rows', () => {
         expect(ingredientQuantityDisplay(rangeIngredient('salt', 1, 2, 'tsp'), weights)).toBe('1-2 tsp');
         expect(ingredientQuantityDisplay(rangeIngredient('flour', 2, 3, 'dl'), null)).toBe('2-3 dl');
         const groups = buildIngredientDisplayGroups(
-            recipe([rangeIngredient('flour', 2, 3, 'dl'), ingredient('flour', 50, 'g')]), settings, weights);
+            recipe([rangeIngredient('flour', 2, 3, 'dl'), ingredient('flour', 50, 'g')]), settings, () => weights);
         expect(groups[0]?.rows[0]?.displayQty).toBe('50 g + 100–150 g');
         expect(recipeHasWeightConversions(recipe([rangeIngredient('flour', 2, 3, 'dl')]), weights)).toBe(true);
+    });
+
+    it('converts only the ingredients the callback picks', () => {
+        const flourWeights = createWeightConverter(parseWeightTable({
+            flour: { grams_per_100ml: 50 }, sugar: { grams_per_100ml: 80 },
+        }).table);
+        const groups = buildIngredientDisplayGroups(
+            recipe([ingredient('flour', 2, 'dl'), ingredient('sugar', 1, 'dl')]),
+            settings,
+            name => name === 'sugar' ? flourWeights : null,
+        );
+        expect(groups[0]?.rows.map(row => row.displayQty)).toEqual(['2 dl', '80 g']);
+    });
+
+    it('lists the names whose amount weight mode would change', () => {
+        expect([...weightConvertibleNames(recipe([
+            ingredient('flour', 2, 'dl'),
+            rangeIngredient('flour', 1, 2, 'dl'),
+            ingredient('sugar', 1, 'lb'),
+            ingredient('salt', 1, 'tsp'),
+        ]), weights)]).toEqual(['flour']);
     });
 });

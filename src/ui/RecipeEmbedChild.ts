@@ -46,9 +46,9 @@ export class RecipeEmbedChild extends MarkdownRenderChild {
                     settings: embedded, host, timers: null, weights: weights(),
                     state: { scale: 1, baseServings: null, displayServings: null,
                         checkedIngredients: new Set<string>(), currentStep: -1,
-                        measure: embedded.preferWeight ? 'weight' : 'volume' },
+                        measure: embedded.preferWeight ? 'weight' : 'volume', flippedMeasures: new Set<string>() },
                     callbacks: { onScaleChange: () => {}, onIngredientToggle: () => {}, onStepActivate: () => {},
-                        onMeasureChange: () => {} },
+                        onMeasureChange: () => {}, onIngredientMeasureToggle: () => {} },
                 };
             },
             publish: state => renderState.set(state),

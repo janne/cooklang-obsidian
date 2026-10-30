@@ -162,6 +162,7 @@ function model(overrides: Partial<RecipeRenderModel> = {}): RecipeRenderModel {
         onIngredientToggle: vi.fn(),
         onStepActivate: vi.fn(),
         onMeasureChange: vi.fn(),
+        onIngredientMeasureToggle: vi.fn(),
     };
     const host: RecipeHostAdapter = {
         getResourcePath: file => file.path,
@@ -187,6 +188,7 @@ function model(overrides: Partial<RecipeRenderModel> = {}): RecipeRenderModel {
             checkedIngredients: new Set(),
             currentStep: -1,
             measure: 'volume',
+            flippedMeasures: new Set(),
         },
         callbacks,
         host,
@@ -702,7 +704,7 @@ describe('volume/weight toggle', () => {
         const weight = screen.getByRole('button', { name: 'Weight' });
         expect(volume.getAttribute('aria-pressed')).toBe('true');
         expect(weight.getAttribute('aria-pressed')).toBe('false');
-        expect(document.querySelector('.cook-ing-qty')?.textContent).toBe('2 cups');
+        expect(document.querySelector('.cook-ing-qty')?.textContent?.trim()).toBe('2 cups');
 
         await fireEvent.click(weight);
         expect(renderModel.callbacks.onMeasureChange).toHaveBeenCalledWith('weight');
@@ -713,7 +715,33 @@ describe('volume/weight toggle', () => {
         render(RecipePreview, { model: model({ weights, state: { ...base.state, measure: 'weight' } }) });
 
         expect(screen.getByRole('button', { name: 'Weight' }).getAttribute('aria-pressed')).toBe('true');
-        expect(document.querySelector('.cook-ing-qty')?.textContent).toBe('251 g');
+        expect(document.querySelector('.cook-ing-qty')?.textContent?.trim()).toBe('251 g');
         expect(document.querySelector('.cook-ig .cook-amt')?.textContent).toBe('(251 g)');
+    });
+
+    it('marks convertible amounts and toggles just that ingredient on click', async () => {
+        const renderModel = model({ weights });
+        render(RecipePreview, { model: renderModel });
+
+        const amount = screen.getByRole('button', { name: '2 cups. Show flour by weight' });
+        expect(amount.classList.contains('cook-ing-qty-toggle')).toBe(true);
+        await fireEvent.click(amount);
+        expect(renderModel.callbacks.onIngredientMeasureToggle).toHaveBeenCalledWith('flour');
+    });
+
+    it('shows a flipped ingredient in the opposite measure, inline too', () => {
+        const base = model();
+        render(RecipePreview, { model: model({
+            weights, state: { ...base.state, measure: 'volume', flippedMeasures: new Set(['flour']) },
+        }) });
+
+        expect(screen.getByRole('button', { name: '251 g. Show flour by volume' })).toBeTruthy();
+        expect(document.querySelector('.cook-ig .cook-amt')?.textContent).toBe('(251 g)');
+    });
+
+    it('keeps amounts plain without a weights table', () => {
+        render(RecipePreview, { model: model() });
+        expect(document.querySelector('.cook-ing-qty-toggle')).toBeNull();
+        expect(document.querySelector('.cook-ing-qty')?.textContent?.trim()).toBe('2 cups');
     });
 });

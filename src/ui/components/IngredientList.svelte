@@ -1,11 +1,41 @@
 <script lang="ts">
-    import { buildIngredientDisplayGroups } from '../../utils/ingredientRows';
-    import { activeWeights, type RecipeRenderModel } from '../types';
+    import type { IngredientRow } from '../../utils/ingredientAggregator';
+    import { buildIngredientDisplayGroups, weightConvertibleNames } from '../../utils/ingredientRows';
+    import { showsWeight, weightsFor, type RecipeRenderModel } from '../types';
     import ReferenceLink from './ReferenceLink.svelte';
 
     let { model }: { model: RecipeRenderModel } = $props();
-    let groups = $derived(buildIngredientDisplayGroups(model.recipe, model.settings, activeWeights(model)));
+    let groups = $derived(buildIngredientDisplayGroups(model.recipe, model.settings, weightsFor(model)));
+    let convertible = $derived(model.interactive ? weightConvertibleNames(model.recipe, model.weights) : new Set<string>());
+
+    function toggleMeasure(event: MouseEvent, name: string): void {
+        // Inside a <summary>, the click would also open or close the preparations.
+        event.preventDefault();
+        event.stopPropagation();
+        model.callbacks.onIngredientMeasureToggle(name);
+    }
 </script>
+
+{#snippet quantity(row: IngredientRow)}
+    {#if row.displayQty && convertible.has(row.name)}
+        {@const target = showsWeight(model, row.name) ? 'volume' : 'weight'}
+        <button
+            type="button"
+            class="cook-ing-qty cook-ing-qty-toggle"
+            aria-label={`${row.displayQty}. Show ${row.name} by ${target}`}
+            title={`Show by ${target}`}
+            onclick={event => toggleMeasure(event, row.name)}
+        >
+            <span>{row.displayQty}</span>
+            <svg class="cook-ing-qty-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="m16 21 4-4-4-4" /><path d="M20 17H4" />
+            </svg>
+        </button>
+    {:else if row.displayQty}
+        <span class="cook-ing-qty">{row.displayQty}</span>
+    {/if}
+{/snippet}
 
 {#if groups.length}
     <section class="cook-ingredients" id="cook-ingredients">
@@ -45,9 +75,7 @@
                                                 {row.name}
                                             {/if}
                                         </span>
-                                        {#if row.displayQty}
-                                            <span class="cook-ing-qty">{row.displayQty}</span>
-                                        {/if}
+                                        {@render quantity(row)}
                                         <span class="cook-ing-disclosure-icon" aria-hidden="true"></span>
                                     </summary>
                                     <ul class="cook-ing-prep-list">
@@ -75,9 +103,7 @@
                                             </span>
                                         {/if}
                                     </span>
-                                    {#if row.displayQty}
-                                        <span class="cook-ing-qty">{row.displayQty}</span>
-                                    {/if}
+                                    {@render quantity(row)}
                                 </div>
                             {/if}
                         </div>

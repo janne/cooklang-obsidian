@@ -8,7 +8,7 @@
     import { numericFromQuantity } from '../../utils/quantityValue';
     import type { StepPart } from '../../utils/sectionHelpers';
     import { ingredientQuantityDisplay } from '../../utils/ingredientRows';
-    import { activeWeights, type RecipeRenderModel } from '../types';
+    import { weightsFor, type RecipeRenderModel } from '../types';
     import InlineText from './InlineText.svelte';
     import ReferenceLink from './ReferenceLink.svelte';
     import TimerButton from './TimerButton.svelte';
@@ -48,7 +48,7 @@
         {:else}
             {ingredient_display_name(part.ingredient)}
         {/if}{#if part.ingredient.note?.trim()}<span class="cook-ig-prep">, {part.ingredient.note.trim()}</span>{/if}{#if model.settings.showQuantitiesInline && part.ingredient.quantity}
-            {' '}<span class="cook-amt">({ingredientQuantityDisplay(part.ingredient, activeWeights(model))})</span>
+            {' '}<span class="cook-amt">({ingredientQuantityDisplay(part.ingredient, weightsFor(model)(ingredient_display_name(part.ingredient)))})</span>
         {/if}
     </span>
 {:else if part.type === 'cookware'}

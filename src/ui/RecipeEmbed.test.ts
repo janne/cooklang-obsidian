@@ -58,12 +58,14 @@ describe('RecipeEmbed', () => {
                 checkedIngredients: new Set(),
                 currentStep: -1,
                 measure: 'volume',
+                flippedMeasures: new Set(),
             },
             callbacks: {
                 onScaleChange: () => {},
                 onIngredientToggle: () => {},
                 onStepActivate: () => {},
                 onMeasureChange: () => {},
+                onIngredientMeasureToggle: () => {},
             },
             host: {
                 getResourcePath: () => '',

@@ -120,7 +120,8 @@ export class CookView extends TextFileView {
             settings: this.settings, host: this.host, timers: session.timers, weights: this.weights(),
             state: { scale: session.scale, baseServings, displayServings,
                 checkedIngredients: session.checkedIngredients, currentStep: session.currentStep,
-                measure: session.measure ?? (this.settings.preferWeight ? 'weight' : 'volume') },
+                measure: session.measure ?? (this.settings.preferWeight ? 'weight' : 'volume'),
+                flippedMeasures: session.flippedMeasures },
             callbacks: {
                 onScaleChange: target => {
                     if (baseServings == null) return;
@@ -138,6 +139,12 @@ export class CookView extends TextFileView {
                 },
                 onMeasureChange: measure => {
                     session.measure = measure;
+                    session.flippedMeasures.clear();
+                    this.renderPreview();
+                },
+                onIngredientMeasureToggle: name => {
+                    if (session.flippedMeasures.has(name)) session.flippedMeasures.delete(name);
+                    else session.flippedMeasures.add(name);
                     this.renderPreview();
                 },
             },

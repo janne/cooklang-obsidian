@@ -284,6 +284,18 @@
 .cook-ing-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cook-ing.done .cook-ing-content { text-decoration: line-through; color: var(--text-faint); }
 .cook-ing-qty { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 0.85em; }
+// A dashed outline and swap icon mark amounts that can switch between volume and weight.
+.cook-ing-qty-toggle {
+  display: inline-flex; flex: none; align-items: center; gap: 4px;
+  height: auto; min-height: 1.6em; margin: 0; padding: 1px 6px;
+  border: 1px dashed var(--background-modifier-border-hover, var(--background-modifier-border));
+  border-radius: 10px; box-shadow: none;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; color: var(--text-muted); font: inherit; font-size: 0.85em;
+  font-variant-numeric: tabular-nums; line-height: 1.3; cursor: pointer;
+}
+.cook-ing-qty-icon { width: 0.95em; height: 0.95em; flex: none; opacity: 0.75; }
+.cook-ing.done .cook-ing-qty-toggle { color: var(--text-faint); text-decoration: line-through; }
 .cook-ing-single-prep { color: var(--text-muted); font-size: 0.9em; }
 .cook-ing-details > summary {
   list-style: none; cursor: pointer;
@@ -470,6 +482,7 @@
   a.cook-pill:hover { color: var(--text-normal); border-color: var(--text-accent); }
   .cook-bar-link:hover { color: var(--text-accent); }
   .cook-stepper-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+  .cook-ing-qty-toggle:hover { border-color: var(--interactive-accent); color: var(--text-normal); }
   .cook-measure-btn[aria-pressed="false"]:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
   .cook-step-toggle:hover { background: var(--background-modifier-hover); }
   .cook-ref-link:hover { text-decoration-style: solid; }
@@ -484,6 +497,7 @@
   .cook-bar-link:active { color: var(--text-accent); }
   .cook-stepper-btn:active,
   .cook-measure-btn[aria-pressed="false"]:active,
+  .cook-ing-qty-toggle:active,
   .cook-step-toggle:active { background: var(--background-modifier-hover); color: var(--text-normal); }
   .cook-ref-link:active { text-decoration-style: solid; }
   .cook-timer-btn:active,
@@ -507,6 +521,9 @@
     width: 48px; min-height: 48px;
   }
   .cook-ing-main { min-height: 48px; }
+  // Compact pill, 48px touch target.
+  .cook-ing-qty-toggle { position: relative; min-height: 32px; padding-inline: 10px; border-radius: 16px; }
+  .cook-ing-qty-toggle::before { content: ''; position: absolute; inset: -8px -2px; }
   .cook-ing > .cook-ing-checkbox { margin-block-start: 15.5px; }
   .cook-step-toggle {
     min-width: 48px; min-height: 48px; margin: -10px 0 -10px -10px;
@@ -603,6 +620,7 @@
 .cook-timer-notice-dismiss:focus-visible,
 .cook-stepper-btn:focus-visible,
 .cook-measure-btn:focus-visible,
+.cook-ing-qty-toggle:focus-visible,
 .cook-ing-checkbox:focus-visible,
 .cook-ing-details > summary:focus-visible,
 .cook-step-toggle:focus-visible,

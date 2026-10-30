@@ -41,7 +41,9 @@ Point **Weights file** in the plugin settings at a YAML file or a Markdown note
 (editable in Obsidian) to convert
 ingredient amounts to grams (rounded to whole grams). When a recipe has convertible
 amounts, the sticky bar shows a **Volume / Weight** toggle; **Prefer weights** chooses
-which one recipes open with, and Markdown embeds always follow that setting.
+which one recipes open with, and Markdown embeds always follow that setting. In the
+preview's ingredient list, convertible amounts have a dashed outline and a swap icon;
+tap one to switch just that ingredient (the global toggle resets these).
 
 ```yaml
 couscous:

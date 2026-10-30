@@ -86,8 +86,10 @@ export default class CookPlugin extends Plugin {
     this.sessions = new RecipeSessions(() => {
       const timers = new TimerService(this.settings, { tickSoundUrl: timerMp3, tickVolume: 0.3 }, this.alarms);
       const checkedIngredients = new Set<string>();
-      return { instanceId: createUiInstanceId('cook-session'), scale: 1, currentStep: -1, checkedIngredients, measure: null, pendingReferenceScale: null, timers,
-        dispose: () => { timers.dispose(); checkedIngredients.clear(); } };
+      const flippedMeasures = new Set<string>();
+      return { instanceId: createUiInstanceId('cook-session'), scale: 1, currentStep: -1, checkedIngredients, measure: null,
+        flippedMeasures, pendingReferenceScale: null, timers,
+        dispose: () => { timers.dispose(); checkedIngredients.clear(); flippedMeasures.clear(); } };
     });
     this.register(() => {
       this.sessions.dispose();

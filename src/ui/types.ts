@@ -6,6 +6,7 @@ import type { RecipeRefTarget } from '../utils/ingredientAggregator';
 import type { TimerSnapshot } from '../services/TimerService';
 import type { RecipeReferenceScaleRequest } from '../utils/scaling';
 import type { MeasureMode, WeightConverter } from '../utils/weightConversion';
+import type { WeightsFor } from '../utils/ingredientRows';
 
 export interface PreviewState {
     scale: number;
@@ -14,6 +15,8 @@ export interface PreviewState {
     checkedIngredients: Set<string>;
     currentStep: number;
     measure: MeasureMode;
+    /** Ingredients (by display name) shown in the opposite measure to `measure`. */
+    flippedMeasures: Set<string>;
 }
 
 export interface PreviewCallbacks {
@@ -21,6 +24,7 @@ export interface PreviewCallbacks {
     onIngredientToggle: (ingredientName: string) => void;
     onStepActivate: (globalStepIndex: number) => void;
     onMeasureChange: (measure: MeasureMode) => void;
+    onIngredientMeasureToggle: (ingredientName: string) => void;
 }
 
 export interface ResolvedRecipeReference {
@@ -56,9 +60,14 @@ export interface RecipeRenderModel {
     weights: WeightConverter | null;
 }
 
-/** The converter to apply to displayed amounts, honouring the volume/weight choice. */
-export function activeWeights(model: RecipeRenderModel): WeightConverter | null {
-    return model.state.measure === 'weight' ? model.weights : null;
+/** Whether an ingredient shows as weight, honouring the global choice and its own toggle. */
+export function showsWeight(model: RecipeRenderModel, ingredientName: string): boolean {
+    return (model.state.measure === 'weight') !== model.state.flippedMeasures.has(ingredientName);
+}
+
+/** The converter for each ingredient's displayed amount. */
+export function weightsFor(model: RecipeRenderModel): WeightsFor {
+    return name => showsWeight(model, name) ? model.weights : null;
 }
 
 export type EmbedRenderState =

@@ -15,6 +15,9 @@ import { numericFromQuantity, rangeFromQuantity } from './quantityValue';
 import { getSections, hasNamedSections } from './sectionHelpers';
 import type { WeightConverter } from './weightConversion';
 
+/** The converter for one ingredient (by display name), or null to show it as written. */
+export type WeightsFor = (ingredientName: string) => WeightConverter | null;
+
 export interface IngredientDisplayGroup {
     name: string | null;
     rows: IngredientRow[];
@@ -54,11 +57,23 @@ export function ingredientQuantityDisplay(ingredient: Ingredient, weights: Weigh
         ?? (ingredient.quantity ? quantity_display(ingredient.quantity) : '');
 }
 
+/** Display names of listed ingredients whose amount weight mode would change. */
+export function weightConvertibleNames(recipe: CooklangRecipe, weights: WeightConverter | null): Set<string> {
+    const names = new Set<string>();
+    if (!weights) return names;
+    for (const ingredient of recipe.ingredients) {
+        if (ingredient_should_be_listed(ingredient)
+            && !weights.isMass(ingredient.quantity?.unit ?? null)
+            && (ingredientGrams(ingredient, weights) !== null || ingredientGramRangeText(ingredient, weights) !== null)) {
+            names.add(ingredient_display_name(ingredient));
+        }
+    }
+    return names;
+}
+
 /** True when weight mode would change at least one listed amount. */
 export function recipeHasWeightConversions(recipe: CooklangRecipe, weights: WeightConverter | null): boolean {
-    return !!weights && recipe.ingredients.some(ingredient => ingredient_should_be_listed(ingredient)
-        && !weights.isMass(ingredient.quantity?.unit ?? null)
-        && (ingredientGrams(ingredient, weights) !== null || ingredientGramRangeText(ingredient, weights) !== null));
+    return weightConvertibleNames(recipe, weights).size > 0;
 }
 
 export function ingredientToAggInput(ingredient: Ingredient, weights: WeightConverter | null = null): AggInput {
@@ -100,14 +115,17 @@ export function ingredientToAggInput(ingredient: Ingredient, weights: WeightConv
 export function buildIngredientDisplayGroups(
     recipe: CooklangRecipe,
     settings: CooklangSettings,
-    weights: WeightConverter | null = null,
+    weightsFor: WeightsFor = () => null,
 ): IngredientDisplayGroup[] {
+    const toInput = (ingredient: Ingredient): AggInput =>
+        ingredientToAggInput(ingredient, weightsFor(ingredient_display_name(ingredient)));
+
     if (!settings.showIngredientList) return [];
 
     const inputForIndex = (index: number): AggInput | null => {
         const ingredient = recipe.ingredients[index];
         return ingredient && ingredient_should_be_listed(ingredient)
-            ? ingredientToAggInput(ingredient, weights)
+            ? toInput(ingredient)
             : null;
     };
 
@@ -121,7 +139,7 @@ export function buildIngredientDisplayGroups(
     const rows = aggregateIngredients(
         recipe.ingredients
             .filter(ingredient => ingredient_should_be_listed(ingredient))
-            .map(ingredient => ingredientToAggInput(ingredient, weights)),
+            .map(toInput),
     );
     return rows.length ? [{ name: null, rows }] : [];
 }
